@@ -4,7 +4,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "swift-consul-service-discovery",
+    name: "package-consul",
     products: [
         .library(
             name: "ConsulServiceDiscovery",

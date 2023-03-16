@@ -3,7 +3,7 @@ import ServiceDiscovery
 
 public final class ConsulServiceDiscovery: ServiceDiscovery {
     public typealias Service = String
-    public typealias Instance = Consul.NodeService
+    public typealias Instance = NodeService
 
     private let consul: Consul
 
@@ -15,14 +15,49 @@ public final class ConsulServiceDiscovery: ServiceDiscovery {
 
     public func lookup(_ service: Service, deadline _: DispatchTime?, callback: @escaping (Result<[Instance], Error>) -> Void) {
         consul.catalogNodes(withService: service).whenComplete { result in
-            callback(result)
+            switch result {
+            case .success(let (_, services)):
+                callback(.success(services))
+            case let .failure(error):
+                callback(.failure(error))
+            }
         }
     }
 
-    public func subscribe(to _: Service,
-                          onNext _: @escaping (Result<[Instance], Error>) -> Void,
-                          onComplete completionHandler: @escaping (CompletionReason) -> Void) -> CancellationToken
-    {
-        return CancellationToken(isCancelled: false, completionHandler: completionHandler)
+    private func subscribe(to service: Service,
+                           onNext nextResultHandler: @escaping (Result<[Instance], Error>) -> Void,
+                           onCompletion completionHandler: @escaping (CompletionReason) -> Void,
+                           cancellationToken: CancellationToken,
+                           polling poll: Consul.Poll?) {
+        consul.catalogNodes(withService: service, poll: poll).whenComplete { result in
+            if cancellationToken.isCancelled {
+                completionHandler(.cancellationRequested)
+            } else {
+                switch result {
+                case .success(let (index, services)):
+                    nextResultHandler(.success(services))
+                    let poll = Consul.Poll(index: index, wait: "10m")
+                    self.subscribe(to: service,
+                                   onNext: nextResultHandler,
+                                   onCompletion: completionHandler,
+                                   cancellationToken: cancellationToken,
+                                   polling: poll)
+                case let .failure(error):
+                    nextResultHandler(.failure(error))
+                }
+            }
+        }
+    }
+
+    public func subscribe(to service: Service,
+                          onNext nextResultHandler: @escaping (Result<[Instance], Error>) -> Void,
+                          onComplete completionHandler: @escaping (CompletionReason) -> Void) -> CancellationToken {
+        let cancellationToken = CancellationToken(isCancelled: false, completionHandler: completionHandler)
+        subscribe(to: service,
+                  onNext: nextResultHandler,
+                  onCompletion: completionHandler,
+                  cancellationToken: cancellationToken,
+                  polling: nil)
+        return cancellationToken
     }
 }

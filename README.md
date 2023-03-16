@@ -1,3 +1,3 @@
-# swift-consul-service-discovery
+# package-consul
 
-A description of this package.
+Consul backend for swift service discovery.

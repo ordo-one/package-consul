@@ -6,6 +6,7 @@ final class ConsulTests: XCTestCase {
     private var eventLoopGroup: MultiThreadedEventLoopGroup?
 
     override func setUp() {
+        super.setUp()
         eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 2)
     }
 
@@ -15,6 +16,7 @@ final class ConsulTests: XCTestCase {
         } catch {
             fatalError("\(error)")
         }
+        super.tearDown()
     }
 
     func testRegisterDeregister() throws {
@@ -22,7 +24,7 @@ final class ConsulTests: XCTestCase {
 
         let processInfo = ProcessInfo.processInfo
         let serviceName = "\(processInfo.hostName)-test_service-\(processInfo.processIdentifier)"
-        let service = Consul.AgentService(ID: serviceName, Address: "127.0.0.1", Name: serviceName, Port: 12345)
+        let service = AgentService(id: serviceName, name: serviceName, address: "127.0.0.1", port: 12_345)
 
         let registerFuture = consul.agentRegister(service: service)
         try registerFuture.wait()

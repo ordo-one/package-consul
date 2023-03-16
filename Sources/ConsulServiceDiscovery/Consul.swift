@@ -4,133 +4,90 @@ import NIOCore
 import NIOHTTP1
 import NIOPosix
 
-var logger = Logger(label: "consul")
-
 public enum ConsulError: Error {
     case failedToConnect(String)
     case error(String)
 }
 
 private protocol ConsulResponseHandler {
-    func process(response buffer: ByteBuffer)
+    func processResponse(_ buffer: ByteBuffer, withIndex: Int?)
     func fail(_ error: Error)
+}
+
+public struct AgentService: Hashable, Encodable {
+    public let id: String
+    public let name: String
+    public let address: String
+    public let port: Int
+    public let meta: [String: String]
+
+    public init(id: String, name: String, address: String, port: Int, meta: [String: String] = [:]) {
+        self.id = id
+        self.name = name
+        self.address = address
+        self.port = port
+        self.meta = meta
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id = "ID"
+        case name = "Name"
+        case address = "Address"
+        case port = "Port"
+        case meta = "Meta"
+    }
+}
+
+public struct NodeService: Hashable, Decodable {
+    public let id: String
+    public let datacenter: String
+    public let address: String
+    public let node: String
+    public let serviceAddress: String
+    public let serviceID: String
+    public let serviceMeta: [String: String]
+    public let serviceName: String
+    public let servicePort: Int
+
+    enum CodingKeys: String, CodingKey {
+        case id = "ID"
+        case datacenter = "Datacenter"
+        case address = "Address"
+        case node = "Node"
+        case serviceAddress = "ServiceAddress"
+        case serviceID = "ServiceID"
+        case serviceMeta = "ServiceMeta"
+        case serviceName = "ServiceName"
+        case servicePort = "ServicePort"
+    }
 }
 
 public class Consul {
     public static let defaultHost = "127.0.0.1"
-    public static let defaultPort = 8500
+    public static let defaultPort = 8_500
 
-    public struct AgentService: Hashable, Encodable {
-        public let ID: String
-        public let Address: String
-        public let Name: String
-        public let Port: Int
+    public static var logger = Logger(label: "consul")
+
+    public struct Poll {
+        public let index: Int
+        public let wait: String?
     }
 
-    public struct NodeService: Hashable, Decodable {
-        public let Address: String
-        public let Datacenter: String
-        public let ID: String
-        public let Node: String
-        public let ServiceID: String
-        public let ServiceName: String
-        public let ServicePort: Int
-    }
+    fileprivate let serverHost: String
+    fileprivate let serverPort: Int
 
-    private let serverHost: String
-    private let serverPort: Int
+    private let eventLoopGroup: EventLoopGroup
 
-    private let eventLoopGroup: MultiThreadedEventLoopGroup
-
-    private class HTTPHandler: ChannelInboundHandler {
-        public typealias InboundIn = HTTPClientResponsePart
-        public typealias OutboundOut = HTTPClientRequestPart
-
-        private let consul: Consul
-        private let requestMethod: HTTPMethod
-        private let requestURI: String
-        private let requestBody: ByteBuffer?
-        private let handler: any ConsulResponseHandler
-        private var handlerCalled: Bool
-
-        init(_ consul: Consul, _ requestMethod: HTTPMethod, _ requestURI: String, _ requestBody: ByteBuffer?, _ handler: any ConsulResponseHandler) {
-            self.consul = consul
-            self.requestMethod = requestMethod
-            self.requestURI = requestURI
-            self.requestBody = requestBody
-            self.handler = handler
-            handlerCalled = false
-        }
-
-        public func channelActive(context: ChannelHandlerContext) {
-            logger.debug("\(context.remoteAddress!): channelActive")
-
-            var headers = HTTPHeaders()
-            headers.add(name: "Host", value: "\(consul.serverHost):\(consul.serverPort)")
-
-            let requestHead = HTTPRequestHead(version: .http1_1,
-                                              method: requestMethod,
-                                              uri: requestURI,
-                                              headers: headers)
-
-            context.write(wrapOutboundOut(.head(requestHead)), promise: nil)
-
-            if let requestBody = requestBody {
-                context.write(wrapOutboundOut(.body(.byteBuffer(requestBody))), promise: nil)
-            }
-
-            context.writeAndFlush(wrapOutboundOut(.end(nil)), promise: nil)
-        }
-
-        public func channelInactive(context: ChannelHandlerContext) {
-            logger.debug("\(context.remoteAddress!): channelInactive")
-            if !handlerCalled {
-                handler.fail(ConsulError.error("connection closed"))
-                handlerCalled = true
-            }
-        }
-
-        public func channelRead(context: ChannelHandlerContext, data: NIOAny) {
-            let response = unwrapInboundIn(data)
-            switch response {
-            case let .head(responseHead):
-                logger.debug("\(context.remoteAddress!): channelRead: head: \(responseHead))")
-                if requestMethod == .PUT {
-                    // body not expected
-                    if responseHead.status == .ok {
-                        handler.process(response: ByteBuffer())
-                    } else {
-                        handler.fail(ConsulError.error("\(responseHead.status)"))
-                    }
-                    handlerCalled = true
-                }
-            case let .body(byteBuffer):
-                logger.debug("\(context.remoteAddress!): channelRead: body \(String(buffer: byteBuffer))")
-                if !handlerCalled {
-                    handler.process(response: byteBuffer)
-                    handlerCalled = true
-                }
-            case .end:
-                logger.debug("\(context.remoteAddress!): channelRead: end, close channel")
-                context.close(promise: nil)
-            }
-        }
-
-        public func errorCaught(context: ChannelHandlerContext, error: Error) {
-            logger.debug("\(context.remoteAddress!): \(error)")
-            if !handlerCalled {
-                handler.fail(error)
-                handlerCalled = true
-            }
-            context.close(promise: nil)
-        }
-    }
-
-    private func request<Handler: ConsulResponseHandler>(_ requestMethod: HTTPMethod, _ requestURI: String, _ requestBody: ByteBuffer?, _ handler: Handler) {
-        _ = ClientBootstrap(group: eventLoopGroup)
+    private func request(method requestMethod: HTTPMethod, uri requestURI: String, body requestBody: ByteBuffer?, handler: some ConsulResponseHandler) {
+        Self.logger.debug("Request \(requestMethod) '\(requestURI)'")
+        ClientBootstrap(group: eventLoopGroup)
             .channelInitializer { channel in
                 channel.pipeline.addHTTPClientHandlers(position: .first, leftOverBytesStrategy: .fireError).flatMap {
-                    channel.pipeline.addHandler(HTTPHandler(self, requestMethod, requestURI, requestBody, handler))
+                    channel.pipeline.addHandler(HTTPHandler(consul: self,
+                                                            requestMethod: requestMethod,
+                                                            requestURI: requestURI,
+                                                            requestBody: requestBody,
+                                                            handler: handler))
                 }
             }
             .connect(host: serverHost, port: serverPort)
@@ -140,7 +97,7 @@ public class Consul {
             }
     }
 
-    public init(host: String = defaultHost, port: Int = defaultPort, with eventLoopGroup: MultiThreadedEventLoopGroup) {
+    public init(host: String = defaultHost, port: Int = defaultPort, with eventLoopGroup: EventLoopGroup) {
         serverHost = host
         serverPort = port
         self.eventLoopGroup = eventLoopGroup
@@ -161,7 +118,7 @@ public class Consul {
                 self.service = service
             }
 
-            func process(response _: ByteBuffer) {
+            func processResponse(_: ByteBuffer, withIndex _: Int?) {
                 promise.succeed()
             }
 
@@ -176,7 +133,7 @@ public class Consul {
             let data = try encoder.encode(service)
             var requestBody = ByteBufferAllocator().buffer(capacity: data.count)
             requestBody.writeBytes(data)
-            request(.PUT, "/v1/agent/service/register", requestBody, ResponseHandler(promise, service))
+            request(method: .PUT, uri: "/v1/agent/service/register", body: requestBody, handler: ResponseHandler(promise, service))
         } catch {
             promise.fail(error)
         }
@@ -196,7 +153,7 @@ public class Consul {
                 self.promise = promise
             }
 
-            func process(response _: ByteBuffer) {
+            func processResponse(_: ByteBuffer, withIndex _: Int?) {
                 promise.succeed()
             }
 
@@ -206,7 +163,7 @@ public class Consul {
         }
 
         let promise = eventLoopGroup.next().makePromise(of: Void.self)
-        request(.PUT, "/v1/agent/service/deregister/\(serviceID)", nil, ResponseHandler(promise))
+        request(method: .PUT, uri: "/v1/agent/service/deregister/\(serviceID)", body: nil, handler: ResponseHandler(promise))
         return promise.futureResult
     }
 
@@ -223,7 +180,7 @@ public class Consul {
                 self.promise = promise
             }
 
-            func process(response buffer: ByteBuffer) {
+            func processResponse(_ buffer: ByteBuffer, withIndex _: Int?) {
                 do {
                     let decoder = JSONDecoder()
                     let data = buffer.withUnsafeReadableBytes { ptr in
@@ -249,7 +206,11 @@ public class Consul {
         }
 
         let promise = eventLoopGroup.next().makePromise(of: [String].self)
-        request(.GET, components.string!, nil, ResponseHandler(promise))
+        if let requestURI = components.string {
+            request(method: .GET, uri: requestURI, body: nil, handler: ResponseHandler(promise))
+        } else {
+            promise.fail(ConsulError.error("Can not build Consul API request string"))
+        }
         return promise.futureResult
     }
 
@@ -260,15 +221,22 @@ public class Consul {
     /// - Returns: EventLoopFuture<[NodeService]> to deliver result
     /// [apidoc]: https://developer.hashicorp.com/consul/api-docs/catalog#list-nodes-for-service
     ///
-    public func catalogNodes(inDatacenter datacenter: String = "", withService serviceName: String) -> EventLoopFuture<[NodeService]> {
+    public func catalogNodes(inDatacenter datacenter: String = "",
+                             withService serviceName: String,
+                             poll: Poll? = nil) -> EventLoopFuture<(Int, [NodeService])> {
         struct ResponseHandler: ConsulResponseHandler {
-            private let promise: EventLoopPromise<[NodeService]>
+            private let promise: EventLoopPromise<(Int, [NodeService])>
 
-            init(_ promise: EventLoopPromise<[NodeService]>) {
+            init(_ promise: EventLoopPromise<(Int, [NodeService])>) {
                 self.promise = promise
             }
 
-            func process(response buffer: ByteBuffer) {
+            func processResponse(_ buffer: ByteBuffer, withIndex: Int?) {
+                guard let withIndex else {
+                    promise.fail(ConsulError.error("Internal error: missing index"))
+                    return
+                }
+
                 do {
                     let decoder = JSONDecoder()
                     let data = buffer.withUnsafeReadableBytes { ptr in
@@ -276,7 +244,7 @@ public class Consul {
                              count: ptr.count)
                     }
                     let services = try decoder.decode([NodeService].self, from: data)
-                    promise.succeed(services)
+                    promise.succeed((withIndex, services))
                 } catch {
                     promise.fail(error)
                 }
@@ -287,14 +255,123 @@ public class Consul {
             }
         }
 
-        var components = URLComponents()
-        components.path = "/v1/catalog/service/\(serviceName)"
+        var queryItems: [URLQueryItem] = []
+
         if !datacenter.isEmpty {
-            components.queryItems = [URLQueryItem(name: "dc", value: datacenter)]
+            queryItems.append(URLQueryItem(name: "dc", value: datacenter))
         }
 
-        let promise = eventLoopGroup.next().makePromise(of: [NodeService].self)
-        request(.GET, "/v1/catalog/service/\(serviceName)", nil, ResponseHandler(promise))
+        if let poll {
+            queryItems.append(URLQueryItem(name: "index", value: "\(poll.index)"))
+            if let wait = poll.wait {
+                queryItems.append(URLQueryItem(name: "wait", value: wait))
+            }
+        }
+
+        var components = URLComponents()
+        components.path = "/v1/catalog/service/\(serviceName)"
+        if !queryItems.isEmpty {
+            components.queryItems = queryItems
+        }
+
+        let promise = eventLoopGroup.next().makePromise(of: (Int, [NodeService]).self)
+        if let requestURI = components.string {
+            request(method: .GET, uri: requestURI, body: nil, handler: ResponseHandler(promise))
+        } else {
+            promise.fail(ConsulError.error("Can not build Consul API request string"))
+        }
         return promise.futureResult
+    }
+}
+
+private class HTTPHandler: ChannelInboundHandler {
+    typealias InboundIn = HTTPClientResponsePart
+    typealias OutboundOut = HTTPClientRequestPart
+
+    private let consul: Consul
+    private let requestMethod: HTTPMethod
+    private let requestURI: String
+    private let requestBody: ByteBuffer?
+    private let handler: any ConsulResponseHandler
+    private var responseBody: ByteBuffer?
+    private var consulIndex: Int?
+
+    init(consul: Consul, requestMethod: HTTPMethod, requestURI: String, requestBody: ByteBuffer?, handler: any ConsulResponseHandler) {
+        self.consul = consul
+        self.requestMethod = requestMethod
+        self.requestURI = requestURI
+        self.requestBody = requestBody
+        responseBody = ByteBuffer()
+        self.handler = handler
+    }
+
+    func channelActive(context: ChannelHandlerContext) {
+        Consul.logger.debug("\(context.remoteAddress!): channelActive")
+
+        var headers = HTTPHeaders()
+        headers.add(name: "Host", value: "\(consul.serverHost):\(consul.serverPort)")
+
+        let requestHead = HTTPRequestHead(version: .http1_1,
+                                          method: requestMethod,
+                                          uri: requestURI,
+                                          headers: headers)
+
+        context.write(wrapOutboundOut(.head(requestHead)), promise: nil)
+
+        if let requestBody {
+            context.write(wrapOutboundOut(.body(.byteBuffer(requestBody))), promise: nil)
+        }
+
+        context.writeAndFlush(wrapOutboundOut(.end(nil)), promise: nil)
+    }
+
+    func channelInactive(context: ChannelHandlerContext) {
+        Consul.logger.debug("\(context.remoteAddress!): channelInactive")
+        if responseBody != nil {
+            handler.fail(ConsulError.error("Unexpected connection closed"))
+            responseBody = nil
+        }
+    }
+
+    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        let response = unwrapInboundIn(data)
+        switch response {
+        case let .head(responseHead):
+            Consul.logger.debug("\(context.remoteAddress!): channelRead: head: \(responseHead))")
+
+            // store consul index from the header to propagate late to the response handler
+            if let consulIndex = responseHead.headers.first(name: "X-Consul-Index") {
+                self.consulIndex = Int(consulIndex)
+            }
+
+            if requestMethod == .PUT {
+                // body not expected
+                if responseHead.status == .ok {
+                    handler.processResponse(ByteBuffer(), withIndex: consulIndex)
+                } else {
+                    handler.fail(ConsulError.error("\(responseHead.status)"))
+                }
+                responseBody = nil
+            }
+        case var .body(buffer):
+            Consul.logger.debug("\(context.remoteAddress!): channelRead: body \(buffer.readableBytes) bytes")
+            responseBody?.writeBuffer(&buffer)
+        case .end:
+            Consul.logger.debug("\(context.remoteAddress!): channelRead: end, close channel")
+            if let responseBody {
+                handler.processResponse(responseBody, withIndex: consulIndex)
+                self.responseBody = nil
+            }
+            context.close(promise: nil)
+        }
+    }
+
+    func errorCaught(context: ChannelHandlerContext, error: Error) {
+        Consul.logger.debug("\(context.remoteAddress!): \(error)")
+        if responseBody != nil {
+            handler.fail(error)
+            responseBody = nil
+        }
+        context.close(promise: nil)
     }
 }
