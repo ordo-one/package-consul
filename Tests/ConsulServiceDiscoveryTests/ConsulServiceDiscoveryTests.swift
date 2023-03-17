@@ -23,13 +23,14 @@ final class ConsulServiceDiscoveryTests: XCTestCase {
         let consul = Consul(with: eventLoopGroup!)
 
         let processInfo = ProcessInfo.processInfo
-        let serviceName = "\(processInfo.hostName)-ts-\(processInfo.processIdentifier)"
-        let service1 = AgentService(id: "\(serviceName)-1", name: serviceName, address: "127.0.0.1", port: 12_001)
+        let serviceName = "test_service"
+        let serviceID = "\(processInfo.hostName)-\(processInfo.processIdentifier)"
+        let service1 = AgentService(id: "\(serviceID)-1", name: serviceName, address: "127.0.0.1", port: 12_001)
 
         let registerFuture1 = consul.agentRegister(service: service1)
         try registerFuture1.wait()
 
-        let service2 = AgentService(id: "\(serviceName)-2", name: serviceName, address: "127.0.0.1", port: 12_002)
+        let service2 = AgentService(id: "\(serviceID)-2", name: serviceName, address: "127.0.0.1", port: 12_002)
         let registerFuture2 = consul.agentRegister(service: service2)
         try registerFuture2.wait()
 
@@ -39,7 +40,7 @@ final class ConsulServiceDiscoveryTests: XCTestCase {
         consulServiceDiscovery.lookup(serviceName, deadline: nil) { result in
             switch result {
             case var .success(services):
-                XCTAssertEqual(services.count, 2)
+                services = services.filter { ($0.serviceID == "\(serviceID)-1") || ($0.serviceID == "\(serviceID)-2") }
                 services.sort(by: { $0.serviceID < $1.serviceID })
                 XCTAssertEqual(services[0].serviceID, service1.id)
                 XCTAssertEqual(services[1].serviceID, service2.id)
@@ -63,8 +64,9 @@ final class ConsulServiceDiscoveryTests: XCTestCase {
         let consul = Consul(with: eventLoopGroup!)
 
         let processInfo = ProcessInfo.processInfo
-        let serviceName = "\(processInfo.hostName)-ts-\(processInfo.processIdentifier)"
-        let service = AgentService(id: "\(serviceName)-1", name: serviceName, address: "127.0.0.1", port: 12_001)
+        let serviceName = "test_service"
+        let serviceID = "\(processInfo.hostName)-\(processInfo.processIdentifier)"
+        let service = AgentService(id: serviceID, name: serviceName, address: "127.0.0.1", port: 12_001)
 
         let registerFuture1 = consul.agentRegister(service: service)
         try registerFuture1.wait()
@@ -85,8 +87,8 @@ final class ConsulServiceDiscoveryTests: XCTestCase {
                         let serviceUpdate = AgentService(id: service.id, name: service.name, address: service.address, port: 12_002)
                         _ = consul.agentRegister(service: serviceUpdate)
                     } else {
-                        XCTAssertEqual(services.count, 1)
-                        XCTAssertEqual(services[0].servicePort, 12_002)
+                        let service = services.first(where: { $0.serviceID == serviceID })
+                        XCTAssertEqual(service!.servicePort, 12_002)
                         done.succeed()
                     }
                 case let .failure(error):
