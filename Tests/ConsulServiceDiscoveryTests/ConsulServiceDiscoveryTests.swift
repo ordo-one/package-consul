@@ -22,16 +22,17 @@ final class ConsulServiceDiscoveryTests: XCTestCase {
     func testLookup() throws {
         let consul = Consul(with: eventLoopGroup!)
 
-        let processInfo = ProcessInfo.processInfo
         let serviceName = "test_service"
+        let check = Check(deregisterCriticalServiceAfter: "1m", name: "\(serviceName)-health-check", status: .passing, ttl: "20s")
+        let processInfo = ProcessInfo.processInfo
         let serviceID = "\(processInfo.hostName)-\(processInfo.processIdentifier)-testLookup"
-        let service1 = AgentService(id: "\(serviceID)-1", name: serviceName, address: "127.0.0.1", port: 12_001)
+        let service1 = Service(checks: [check], id: "\(serviceID)-1", name: serviceName, port: 12_001)
 
-        let registerFuture1 = consul.agentRegister(service: service1)
+        let registerFuture1 = consul.agentRegisterService(service1)
         try registerFuture1.wait()
 
-        let service2 = AgentService(id: "\(serviceID)-2", name: serviceName, address: "127.0.0.1", port: 12_002)
-        let registerFuture2 = consul.agentRegister(service: service2)
+        let service2 = Service(checks: [check], id: "\(serviceID)-2", name: serviceName, port: 12_002)
+        let registerFuture2 = consul.agentRegisterService(service2)
         try registerFuture2.wait()
 
         let lookupDone = eventLoopGroup!.next().makePromise(of: Void.self)
@@ -53,10 +54,10 @@ final class ConsulServiceDiscoveryTests: XCTestCase {
 
         try lookupDone.futureResult.wait()
 
-        let deregisterFuture1 = consul.agentDeregister(serviceID: service1.id)
+        let deregisterFuture1 = consul.agentDeregisterServiceID(service1.id!)
         try deregisterFuture1.wait()
 
-        let deregisterFuture2 = consul.agentDeregister(serviceID: service2.id)
+        let deregisterFuture2 = consul.agentDeregisterServiceID(service2.id!)
         try deregisterFuture2.wait()
     }
 
@@ -66,9 +67,9 @@ final class ConsulServiceDiscoveryTests: XCTestCase {
         let processInfo = ProcessInfo.processInfo
         let serviceName = "test_service"
         let serviceID = "\(processInfo.hostName)-\(processInfo.processIdentifier)-testSubscribe"
-        let service = AgentService(id: serviceID, name: serviceName, address: "127.0.0.1", port: 12_001)
-
-        let registerFuture1 = consul.agentRegister(service: service)
+        let check = Check(deregisterCriticalServiceAfter: "1m", name: "\(serviceName)-health-check", status: .passing, ttl: "20s")
+        let service = Service(address: "127.0.0.1", checks: [check], id: serviceID, name: serviceName, port: 12_001)
+        let registerFuture1 = consul.agentRegisterService(service)
         try registerFuture1.wait()
 
         let done = eventLoopGroup!.next().makePromise(of: Void.self)
@@ -84,8 +85,8 @@ final class ConsulServiceDiscoveryTests: XCTestCase {
                     nextResultHandlerCalledTimes += 1
                     if nextResultHandlerCalledTimes == 1 {
                         // update service with a different port number
-                        let serviceUpdate = AgentService(id: service.id, name: service.name, address: service.address, port: 12_002)
-                        _ = consul.agentRegister(service: serviceUpdate)
+                        let serviceUpdate = Service(checks: [check], id: service.id, name: service.name, port: 12_002)
+                        _ = consul.agentRegisterService(serviceUpdate)
                     } else {
                         let service = services.first(where: { $0.serviceID == serviceID })
                         if service!.servicePort == 12_002 {
@@ -103,7 +104,7 @@ final class ConsulServiceDiscoveryTests: XCTestCase {
         try done.futureResult.wait()
         cancellationToken.cancel()
 
-        let deregisterFuture = consul.agentDeregister(serviceID: service.id)
+        let deregisterFuture = consul.agentDeregisterServiceID(service.id!)
         try deregisterFuture.wait()
     }
 }

@@ -24,17 +24,19 @@ final class ConsulTests: XCTestCase {
 
         let serviceName = "test_service"
         let processInfo = ProcessInfo.processInfo
-        let serviceID = "\(processInfo.hostName)-\(processInfo.processIdentifier)"
-        let service = AgentService(id: serviceID, name: serviceName, address: "127.0.0.1", port: 12_345)
+        let serviceID = "\(processInfo.hostName)-\(processInfo.processIdentifier)-\(serviceName)"
 
-        let registerFuture = consul.agentRegister(service: service)
+        let check = Check(deregisterCriticalServiceAfter: "1m", name: "\(serviceName)-health-check", status: .passing, ttl: "30s")
+        let service = Service(checks: [check], id: serviceID, name: serviceName, port: 12_345)
+
+        let registerFuture = consul.agentRegisterService(service)
         try registerFuture.wait()
 
         let servicesFuture = consul.catalogServices()
         let services = try servicesFuture.wait()
         XCTAssertTrue(services.contains(where: { $0 == serviceName }))
 
-        let deregisterFuture = consul.agentDeregister(serviceID: serviceID)
+        let deregisterFuture = consul.agentDeregisterServiceID(serviceID)
         try deregisterFuture.wait()
     }
 }

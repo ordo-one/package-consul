@@ -1,3 +1,4 @@
+import ExtrasJSON
 import Foundation
 import Logging
 import NIOCore
@@ -12,54 +13,6 @@ public enum ConsulError: Error {
 private protocol ConsulResponseHandler {
     func processResponse(_ buffer: ByteBuffer, withIndex: Int?)
     func fail(_ error: Error)
-}
-
-public struct AgentService: Hashable, Encodable {
-    public let id: String
-    public let name: String
-    public let address: String
-    public let port: Int
-    public let meta: [String: String]
-
-    public init(id: String, name: String, address: String, port: Int, meta: [String: String] = [:]) {
-        self.id = id
-        self.name = name
-        self.address = address
-        self.port = port
-        self.meta = meta
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case id = "ID"
-        case name = "Name"
-        case address = "Address"
-        case port = "Port"
-        case meta = "Meta"
-    }
-}
-
-public struct NodeService: Hashable, Decodable {
-    public let id: String
-    public let datacenter: String
-    public let address: String
-    public let node: String
-    public let serviceAddress: String
-    public let serviceID: String
-    public let serviceMeta: [String: String]
-    public let serviceName: String
-    public let servicePort: Int
-
-    enum CodingKeys: String, CodingKey {
-        case id = "ID"
-        case datacenter = "Datacenter"
-        case address = "Address"
-        case node = "Node"
-        case serviceAddress = "ServiceAddress"
-        case serviceID = "ServiceID"
-        case serviceMeta = "ServiceMeta"
-        case serviceName = "ServiceName"
-        case servicePort = "ServicePort"
-    }
 }
 
 public class Consul {
@@ -108,12 +61,12 @@ public class Consul {
     /// - Returns: EventLoopFuture<Void> to deliver result
     /// [apidoc]: https://www.consul.io/api/agent/service.html#register-service
     ///
-    public func agentRegister(service: AgentService) -> EventLoopFuture<Void> {
+    public func agentRegisterService(_ service: Service) -> EventLoopFuture<Void> {
         struct ResponseHandler: ConsulResponseHandler {
             private let promise: EventLoopPromise<Void>
-            private let service: AgentService
+            private let service: Service
 
-            init(_ promise: EventLoopPromise<Void>, _ service: AgentService) {
+            init(_ promise: EventLoopPromise<Void>, _ service: Service) {
                 self.promise = promise
                 self.service = service
             }
@@ -129,8 +82,7 @@ public class Consul {
 
         let promise = eventLoopGroup.next().makePromise(of: Void.self)
         do {
-            let encoder = JSONEncoder()
-            let data = try encoder.encode(service)
+            let data = try XJSONEncoder().encode(service)
             var requestBody = ByteBufferAllocator().buffer(capacity: data.count)
             requestBody.writeBytes(data)
             request(method: .PUT, uri: "/v1/agent/service/register", body: requestBody, handler: ResponseHandler(promise, service))
@@ -145,7 +97,7 @@ public class Consul {
     /// - Returns: EventLoopFuture<Void> to deliver result
     /// [apidoc]: https://developer.hashicorp.com/consul/api-docs/agent/service#deregister-service
     ///
-    public func agentDeregister(serviceID: String) -> EventLoopFuture<Void> {
+    public func agentDeregisterServiceID(_ serviceID: String) -> EventLoopFuture<Void> {
         struct ResponseHandler: ConsulResponseHandler {
             private let promise: EventLoopPromise<Void>
 
@@ -182,12 +134,8 @@ public class Consul {
 
             func processResponse(_ buffer: ByteBuffer, withIndex _: Int?) {
                 do {
-                    let decoder = JSONDecoder()
-                    let data = buffer.withUnsafeReadableBytes { ptr in
-                        Data(bytes: UnsafeMutableRawPointer(mutating: ptr.baseAddress!),
-                             count: ptr.count)
-                    }
-                    let dict = try decoder.decode([String: [String]].self, from: data)
+                    var buffer = buffer
+                    let dict = try XJSONDecoder().decode([String: [String]].self, from: buffer.readBytes(length: buffer.readableBytes)!)
                     promise.succeed(Array(dict.keys))
                 } catch {
                     promise.fail(error)
@@ -238,12 +186,8 @@ public class Consul {
                 }
 
                 do {
-                    let decoder = JSONDecoder()
-                    let data = buffer.withUnsafeReadableBytes { ptr in
-                        Data(bytes: UnsafeMutableRawPointer(mutating: ptr.baseAddress!),
-                             count: ptr.count)
-                    }
-                    let services = try decoder.decode([NodeService].self, from: data)
+                    var buffer = buffer
+                    let services = try XJSONDecoder().decode([NodeService].self, from: buffer.readBytes(length: buffer.readableBytes)!)
                     promise.succeed((withIndex, services))
                 } catch {
                     promise.fail(error)
