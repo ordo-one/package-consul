@@ -24,7 +24,7 @@ final class ConsulServiceDiscoveryTests: XCTestCase {
 
         let processInfo = ProcessInfo.processInfo
         let serviceName = "test_service"
-        let serviceID = "\(processInfo.hostName)-\(processInfo.processIdentifier)"
+        let serviceID = "\(processInfo.hostName)-\(processInfo.processIdentifier)-testLookup"
         let service1 = AgentService(id: "\(serviceID)-1", name: serviceName, address: "127.0.0.1", port: 12_001)
 
         let registerFuture1 = consul.agentRegister(service: service1)
@@ -65,7 +65,7 @@ final class ConsulServiceDiscoveryTests: XCTestCase {
 
         let processInfo = ProcessInfo.processInfo
         let serviceName = "test_service"
-        let serviceID = "\(processInfo.hostName)-\(processInfo.processIdentifier)"
+        let serviceID = "\(processInfo.hostName)-\(processInfo.processIdentifier)-testSubscribe"
         let service = AgentService(id: serviceID, name: serviceName, address: "127.0.0.1", port: 12_001)
 
         let registerFuture1 = consul.agentRegister(service: service)
@@ -88,8 +88,9 @@ final class ConsulServiceDiscoveryTests: XCTestCase {
                         _ = consul.agentRegister(service: serviceUpdate)
                     } else {
                         let service = services.first(where: { $0.serviceID == serviceID })
-                        XCTAssertEqual(service!.servicePort, 12_002)
-                        done.succeed()
+                        if service!.servicePort == 12_002 {
+                            done.succeed()
+                        }
                     }
                 case let .failure(error):
                     XCTFail("2 service instances expected: \(error)")
