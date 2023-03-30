@@ -18,7 +18,7 @@ public struct Service: Codable {
     /// List of string values that can be used to add service-level labels.
     let tags: [String]?
 
-    init(address: String? = nil, checks: [Check]? = nil, id: String? = nil, meta: [String: String]? = nil, name: String? = nil, port: Int? = nil, tags: [String]? = nil) {
+    public init(address: String? = nil, checks: [Check]? = nil, id: String? = nil, meta: [String: String]? = nil, name: String? = nil, port: Int? = nil, tags: [String]? = nil) {
         self.address = address
         self.checks = checks
         self.id = id
@@ -54,7 +54,7 @@ public struct Check: Codable {
     /// Specifies this is a TTL check. Must be a duration string, such as `10s` or `5m`.
     let ttl: String?
 
-    init(checkID: String? = nil, deregisterCriticalServiceAfter: String? = nil, name: String? = nil, status: Status? = nil, timeout: String? = nil, ttl: String? = nil) {
+    public init(checkID: String? = nil, deregisterCriticalServiceAfter: String? = nil, name: String? = nil, status: Status? = nil, timeout: String? = nil, ttl: String? = nil) {
         self.checkID = checkID
         self.deregisterCriticalServiceAfter = deregisterCriticalServiceAfter
         self.name = name
@@ -91,7 +91,7 @@ public struct NodeService: Hashable, Decodable {
     public let serviceName: String?
     public let servicePort: Int?
 
-    enum CodingKeys: String, CodingKey {
+    public enum CodingKeys: String, CodingKey {
         case address = "Address"
         case datacenter = "Datacenter"
         case id = "ID"
