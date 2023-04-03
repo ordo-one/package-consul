@@ -41,8 +41,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-nio.git",
       "state" : {
-        "branch" : "main",
-        "revision" : "9b2848d76f5caad08b97e71a04345aa5bdb23a06"
+        "revision" : "9b2848d76f5caad08b97e71a04345aa5bdb23a06",
+        "version" : "2.49.0"
       }
     },
     {
@@ -50,8 +50,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-service-discovery.git",
       "state" : {
-        "branch" : "main",
-        "revision" : "fc28e65b74c801b4de20a5db677202847fa870b8"
+        "revision" : "c83afedb1c95ef0111907cd6e2fd03d7175cc0d0",
+        "version" : "1.2.0"
       }
     }
   ],
