@@ -46,6 +46,9 @@ jobs:
     - name: Clean before debug build thread sanitizier
       run: swift package clean
 
+    - name: Build with thread sanitizer
+      run: swift build --sanitize=thread
+
     - name: Run thread sanitizer
       run: swift test --sanitize=thread | swift demangle
       

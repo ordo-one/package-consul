@@ -11,11 +11,11 @@ on:
       - '**.h'
   pull_request:
     branches: [ main ]
-    paths:
-      - '**.swift'
-      - 'Package.resolved'
-      - '**.c'
-      - '**.h'
+#    paths:
+#      - '**.swift'
+#      - 'Package.resolved'
+#      - '**.c'
+#      - '**.h'
 
 jobs:
   build-linux:
@@ -41,4 +41,6 @@ jobs:
 
     - name: Run tests
       run: |
-        [ -d Tests ] && swift test --parallel
+        if [ -d Tests ]; then
+          swift test --parallel
+        fi

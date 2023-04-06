@@ -46,6 +46,9 @@ jobs:
     - name: Clean before debug build sanitizier
       run: swift package clean
 
+    - name: Build with address sanitizer
+      run: swift build --sanitize=address
+
     - name: Run address sanitizer
       run: swift test --sanitize=address | swift demangle
       

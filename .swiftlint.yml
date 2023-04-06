@@ -8,6 +8,8 @@
 # Documentation is under https://github.com/realm/SwiftLint
 ####################################################################
 
+disabled_rules:
+  - todo
 included:
   - Benchmarks
   - Sources

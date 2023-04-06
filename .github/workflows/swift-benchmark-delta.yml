@@ -12,7 +12,7 @@ on:
   
 jobs:
   benchmark-delta:
-
+    timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     continue-on-error: true
 

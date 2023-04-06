@@ -11,11 +11,11 @@ on:
       - '**.h'
   pull_request:
     branches: [ main ]
-    paths:
-      - '**.swift'
-      - 'Package.resolved'
-      - '**.c'
-      - '**.h'
+#    paths:
+#      - '**.swift'
+#      - 'Package.resolved'
+#      - '**.c'
+#      - '**.h'
 
 jobs:
   build-macos:
@@ -36,6 +36,8 @@ jobs:
       run: swift build
     - name: Run tests
       run: |
-        [ -d Tests ] && swift test --parallel
+        if [ -d Tests ]; then
+          swift test --parallel
+        fi
     - name: Wipe gitconfig
       run: echo "" > ~/.gitconfig

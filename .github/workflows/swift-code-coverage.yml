@@ -27,7 +27,9 @@ jobs:
       run: git config --global url."https://ordo-ci:${{ secrets.CI_MACHINE_PAT }}@github.com".insteadOf "https://github.com"
     - name: Run tests
       run: |
-        [ -d Tests ] && swift test --parallel --enable-code-coverage
+        if [ -d Tests ]; then
+          swift test --parallel --enable-code-coverage
+        fi
 #    - name: Extract default SPM library testtarget
 #      id: spm_test_target
 #      run: |
