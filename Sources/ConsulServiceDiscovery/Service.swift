@@ -64,7 +64,7 @@ public struct Check: Codable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case checkID = "checkId"
+        case checkID = "CheckID"
         case deregisterCriticalServiceAfter = "DeregisterCriticalServiceAfter"
         case name = "Name"
         case status = "Status"

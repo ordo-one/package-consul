@@ -50,6 +50,22 @@ public class Consul {
             }
     }
 
+    private struct ResponseHandlerVoid: ConsulResponseHandler {
+        private let promise: EventLoopPromise<Void>
+
+        init(_ promise: EventLoopPromise<Void>) {
+            self.promise = promise
+        }
+
+        func processResponse(_: ByteBuffer, withIndex _: Int?) {
+            promise.succeed()
+        }
+
+        func fail(_ error: Error) {
+            promise.fail(error)
+        }
+    }
+
     public init(host: String = defaultHost, port: Int = defaultPort, with eventLoopGroup: EventLoopGroup) {
         serverHost = host
         serverPort = port
@@ -62,30 +78,12 @@ public class Consul {
     /// [apidoc]: https://www.consul.io/api/agent/service.html#register-service
     ///
     public func agentRegisterService(_ service: Service) -> EventLoopFuture<Void> {
-        struct ResponseHandler: ConsulResponseHandler {
-            private let promise: EventLoopPromise<Void>
-            private let service: Service
-
-            init(_ promise: EventLoopPromise<Void>, _ service: Service) {
-                self.promise = promise
-                self.service = service
-            }
-
-            func processResponse(_: ByteBuffer, withIndex _: Int?) {
-                promise.succeed()
-            }
-
-            func fail(_ error: Error) {
-                promise.fail(error)
-            }
-        }
-
         let promise = eventLoopGroup.next().makePromise(of: Void.self)
         do {
             let data = try XJSONEncoder().encode(service)
             var requestBody = ByteBufferAllocator().buffer(capacity: data.count)
             requestBody.writeBytes(data)
-            request(method: .PUT, uri: "/v1/agent/service/register", body: requestBody, handler: ResponseHandler(promise, service))
+            request(method: .PUT, uri: "/v1/agent/service/register", body: requestBody, handler: ResponseHandlerVoid(promise))
         } catch {
             promise.fail(error)
         }
@@ -98,24 +96,27 @@ public class Consul {
     /// [apidoc]: https://developer.hashicorp.com/consul/api-docs/agent/service#deregister-service
     ///
     public func agentDeregisterServiceID(_ serviceID: String) -> EventLoopFuture<Void> {
-        struct ResponseHandler: ConsulResponseHandler {
-            private let promise: EventLoopPromise<Void>
-
-            init(_ promise: EventLoopPromise<Void>) {
-                self.promise = promise
-            }
-
-            func processResponse(_: ByteBuffer, withIndex _: Int?) {
-                promise.succeed()
-            }
-
-            func fail(_ error: Error) {
-                promise.fail(error)
-            }
-        }
-
         let promise = eventLoopGroup.next().makePromise(of: Void.self)
-        request(method: .PUT, uri: "/v1/agent/service/deregister/\(serviceID)", body: nil, handler: ResponseHandler(promise))
+        request(method: .PUT, uri: "/v1/agent/service/deregister/\(serviceID)", body: nil, handler: ResponseHandlerVoid(promise))
+        return promise.futureResult
+    }
+
+    /// Set the status of the check and to reset the TTL clock.
+    public func agentTTLCheck(_ checkID: String, _ status: Status) -> EventLoopFuture<Void> {
+        var uri: String
+        switch status {
+        case .passing:
+            uri = "pass"
+        case .warning:
+            uri = "warn"
+        case .critical:
+            uri = "fail"
+        case .maintenance:
+            return eventLoopGroup.next().makeFailedFuture(ConsulError.error("'maintenance' status not supported yet"))
+        }
+        let promise = eventLoopGroup.next().makePromise(of: Void.self)
+        uri = "/v1/agent/check/\(uri)/\(checkID)"
+        request(method: .PUT, uri: uri, body: nil, handler: ResponseHandlerVoid(promise))
         return promise.futureResult
     }
 
