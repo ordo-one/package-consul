@@ -93,3 +93,6 @@ line_length:
   ignores_interpolated_strings: true
 identifier_name:
   excluded: [id, i, j, k]
+type_body_length:
+  warning: 600
+  error: 750
