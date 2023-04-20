@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [[swift-latest, ubuntu-latest, self-hosted], [swift-nightly, ubuntu-latest, self-hosted]]
+        os: [[swift-latest, ubuntu-latest, self-hosted], [swift-nightly, ubuntu-latest, self-hosted], [swift-previous, ubuntu-latest, self-hosted]]
 
     timeout-minutes: 60
     runs-on: ${{ matrix.os }}
