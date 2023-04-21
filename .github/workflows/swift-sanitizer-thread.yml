@@ -50,13 +50,13 @@ jobs:
       run: swift build --sanitize=thread
 
     - name: Run thread sanitizer
-      run: swift test --sanitize=thread | swift demangle
+      run: swift test --sanitize=thread
       
     - name: Clean before release build sanitizier
       run: swift package clean
       
     - name: Run thread sanitizer on release build
-      run: swift test --sanitize=thread -c release -Xswiftc -enable-testing | swift demangle
+      run: swift test --sanitize=thread -c release -Xswiftc -enable-testing
 
     - name: Wipe gitconfig Mac
       if: ${{ runner.os == 'Macos' }}
