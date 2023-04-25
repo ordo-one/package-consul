@@ -33,7 +33,8 @@ jobs:
       - name: Run benchmarks for PR branch
         if: ${{ env.hasBenchmark == '1' }}
         run: |
-          swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update pull_request --no-progress --quiet
+          echo "exitStatus=1" >> $GITHUB_ENV
+          swift package --disable-sandbox benchmark baseline update pull_request --no-progress --quiet
       - name: Switch to branch 'main'
         if: ${{ env.hasBenchmark == '1' }}
         run: |
@@ -42,15 +43,14 @@ jobs:
       - name: Run benchmarks for branch 'main'
         if: ${{ env.hasBenchmark == '1' }}
         run: |
-          swift package --allow-writing-to-directory .benchmarkBaselines/ benchmark baseline update main --no-progress --quiet
+          swift package --disable-sandbox benchmark baseline update main --no-progress --quiet
       - name: Compare PR and main
         if: ${{ env.hasBenchmark == '1' }}
         id: benchmark
         run: |
           echo $(date) >> $GITHUB_STEP_SUMMARY
-          echo "exitStatus=1" >> $GITHUB_ENV
           swift package benchmark baseline check main pull_request --format markdown >> $GITHUB_STEP_SUMMARY
-          echo "exitStatus=0" >> $GITHUB_ENV
+          echo "exitStatus=$?" >> $GITHUB_ENV
         continue-on-error: true
       - if: ${{ env.exitStatus == '0' }}
         name: Pull request comment text success
