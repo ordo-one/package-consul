@@ -37,6 +37,7 @@ jobs:
     - name: Run tests
       run: |
         if [ -d Tests ]; then
+          export BENCHMARK_DISABLE_JEMALLOC=true
           swift test --parallel
         fi
     - name: Wipe gitconfig
