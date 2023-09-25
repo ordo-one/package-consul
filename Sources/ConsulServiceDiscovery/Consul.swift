@@ -532,7 +532,7 @@ private class HTTPHandler: ChannelInboundHandler {
     }
 
     func channelActive(context: ChannelHandlerContext) {
-        Consul.logger.debug("\(context.remoteAddress!): channelActive")
+        Consul.logger.trace("\(logPrefix(context: context)): channelActive")
 
         var headers = HTTPHeaders()
         headers.add(name: "Host", value: "\(serverHost):\(serverPort)")
@@ -552,7 +552,7 @@ private class HTTPHandler: ChannelInboundHandler {
     }
 
     func channelInactive(context: ChannelHandlerContext) {
-        Consul.logger.debug("\(context.remoteAddress!): channelInactive")
+        Consul.logger.trace("\(logPrefix(context: context)): channelInactive")
         if responseBody != nil {
             handler.fail(ConsulError.error("Unexpected connection closed"))
             responseBody = nil
@@ -563,7 +563,7 @@ private class HTTPHandler: ChannelInboundHandler {
         let response = unwrapInboundIn(data)
         switch response {
         case let .head(responseHead):
-            Consul.logger.debug("\(context.remoteAddress!): channelRead: head: \(responseHead))")
+            Consul.logger.trace("\(logPrefix(context: context)): channelRead: head: \(responseHead))")
 
             // store consul index from the header to propagate later to the response handler
             if let consulIndex = responseHead.headers.first(name: "X-Consul-Index") {
@@ -580,10 +580,10 @@ private class HTTPHandler: ChannelInboundHandler {
                 responseBody = nil
             }
         case var .body(buffer):
-            Consul.logger.debug("\(context.remoteAddress!): channelRead: body \(buffer.readableBytes) bytes")
+            Consul.logger.trace("\(logPrefix(context: context)): channelRead: body \(buffer.readableBytes) bytes")
             responseBody?.writeBuffer(&buffer)
         case .end:
-            Consul.logger.debug("\(context.remoteAddress!): channelRead: end, close channel")
+            Consul.logger.trace("\(logPrefix(context: context)): channelRead: end, close channel")
             if let responseBody {
                 handler.processResponse(responseBody, withIndex: consulIndex)
                 self.responseBody = nil
