@@ -5,6 +5,10 @@ import PackageDescription
 
 let package = Package(
     name: "package-consul",
+    platforms: [
+        .macOS(.v13),
+        .iOS(.v16),
+    ],
     products: [
         .library(
             name: "ConsulServiceDiscovery",
