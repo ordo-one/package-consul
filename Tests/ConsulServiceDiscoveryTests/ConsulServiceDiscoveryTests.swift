@@ -1,4 +1,5 @@
 @testable import ConsulServiceDiscovery
+import Atomics
 import NIOPosix
 import ServiceDiscovery
 import XCTest
@@ -68,7 +69,7 @@ final class ConsulServiceDiscoveryTests: XCTestCase {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         let done = eventLoopGroup.next().makePromise(of: Void.self)
 
-        var nextResultHandlerCalledTimes = 0
+        let nextResultHandlerCalledTimes = ManagedAtomic(0)
 
         let consulServiceDiscovery = ConsulServiceDiscovery(consul)
         let cancellationToken = consulServiceDiscovery.subscribe(
@@ -76,8 +77,8 @@ final class ConsulServiceDiscoveryTests: XCTestCase {
             onNext: { result in
                 switch result {
                 case let .success(services):
-                    nextResultHandlerCalledTimes += 1
-                    if nextResultHandlerCalledTimes == 1 {
+                    let res = nextResultHandlerCalledTimes.loadThenWrappingIncrement(ordering: .relaxed) + 1
+                    if res == 1 {
                         // update service with a different port number
                         let serviceUpdate = Service(checks: [check], id: service.id, name: service.name, port: 12_002)
                         _ = consul.agent.registerService(serviceUpdate)
