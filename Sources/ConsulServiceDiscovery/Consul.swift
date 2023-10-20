@@ -10,12 +10,12 @@ public enum ConsulError: Error {
     case error(String)
 }
 
-private protocol ConsulResponseHandler {
+private protocol ConsulResponseHandler: Sendable {
     func processResponse(_ buffer: ByteBuffer, withIndex: Int?)
     func fail(_ error: Error)
 }
 
-public class Consul {
+public final class Consul: Sendable {
     public static var defaultHost: String {
         let defaultHost = "127.0.0.1"
 
@@ -44,7 +44,7 @@ public class Consul {
         return urlPort
     }
 
-    public struct Agent {
+    public struct Agent: Sendable {
         private let impl: Impl
 
         fileprivate init(_ impl: Impl) {
@@ -98,7 +98,7 @@ public class Consul {
         }
     }
 
-    public struct Catalog {
+    public struct Catalog: Sendable {
         private let impl: Impl
 
         fileprivate init(_ impl: Impl) {
@@ -226,7 +226,7 @@ public class Consul {
         }
     }
 
-    public struct KV {
+    public struct KV: Sendable {
         private let impl: Impl
 
         fileprivate init(_ impl: Impl) {
@@ -399,7 +399,7 @@ public class Consul {
         public let wait: String?
     }
 
-    public static var logger = Logger(label: "consul")
+    public static let logger = Logger(label: "consul")
 
     private let impl: Impl
 
@@ -407,7 +407,7 @@ public class Consul {
     public let catalog: Catalog
     public let kv: KV
 
-    fileprivate class Impl {
+    fileprivate final class Impl: Sendable {
         let serverHost: String
         let serverPort: Int
         let eventLoopGroup: EventLoopGroup
@@ -459,7 +459,7 @@ public class Consul {
         }
     }
 
-    private struct ResponseHandler<T: Decodable>: ConsulResponseHandler {
+    private struct ResponseHandler<T: Decodable & Sendable>: ConsulResponseHandler, Sendable {
         private let promise: EventLoopPromise<T>
 
         init(_ promise: EventLoopPromise<T>) {

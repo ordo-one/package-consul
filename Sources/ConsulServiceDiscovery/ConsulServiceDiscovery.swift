@@ -1,7 +1,8 @@
 import Dispatch
-import ServiceDiscovery
+#warning("Remove preconcurrency after migration to ServiceDiscovery 2.0")
+@preconcurrency import ServiceDiscovery
 
-public final class ConsulServiceDiscovery: ServiceDiscovery {
+public final class ConsulServiceDiscovery: ServiceDiscovery, Sendable {
     public typealias Service = String
     public typealias Instance = NodeService
 
@@ -13,7 +14,7 @@ public final class ConsulServiceDiscovery: ServiceDiscovery {
 
     public let defaultLookupTimeout: DispatchTimeInterval = .seconds(1)
 
-    public func lookup(_ service: Service, deadline _: DispatchTime?, callback: @escaping (Result<[Instance], Error>) -> Void) {
+    public func lookup(_ service: Service, deadline _: DispatchTime?, callback: @escaping @Sendable (Result<[Instance], Error>) -> Void) {
         consul.catalog.nodes(withService: service).whenComplete { result in
             switch result {
             case .success(let (_, services)):
@@ -25,8 +26,8 @@ public final class ConsulServiceDiscovery: ServiceDiscovery {
     }
 
     private func subscribe(to service: Service,
-                           onNext nextResultHandler: @escaping (Result<[Instance], Error>) -> Void,
-                           onCompletion completionHandler: @escaping (CompletionReason) -> Void,
+                           onNext nextResultHandler: @escaping @Sendable (Result<[Instance], Error>) -> Void,
+                           onCompletion completionHandler: @escaping @Sendable (CompletionReason) -> Void,
                            cancellationToken: CancellationToken,
                            polling poll: Consul.Poll?) {
         consul.catalog.nodes(withService: service, poll: poll).whenComplete { result in
@@ -50,8 +51,8 @@ public final class ConsulServiceDiscovery: ServiceDiscovery {
     }
 
     public func subscribe(to service: Service,
-                          onNext nextResultHandler: @escaping (Result<[Instance], Error>) -> Void,
-                          onComplete completionHandler: @escaping (CompletionReason) -> Void) -> CancellationToken {
+                          onNext nextResultHandler: @escaping @Sendable (Result<[Instance], Error>) -> Void,
+                          onComplete completionHandler: @escaping @Sendable (CompletionReason) -> Void) -> CancellationToken {
         let cancellationToken = CancellationToken(isCancelled: false, completionHandler: completionHandler)
         subscribe(to: service,
                   onNext: nextResultHandler,

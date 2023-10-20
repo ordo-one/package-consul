@@ -73,13 +73,13 @@ public struct Check: Codable {
     }
 }
 
-public enum Status: String, Codable {
+public enum Status: String, Codable, Sendable {
     case critical
     case passing
     case warning
 }
 
-public struct NodeService: Hashable, Decodable {
+public struct NodeService: Hashable, Decodable, Sendable {
     public let address: String?
     public let createIndex: Int?
     public let datacenter: String?
@@ -121,7 +121,7 @@ public struct NodeService: Hashable, Decodable {
     }
 }
 
-public struct Value: Hashable, Decodable {
+public struct Value: Hashable, Decodable, Sendable {
     public let flags: Int?
     public let key: String?
     public let value: String?
