@@ -419,7 +419,7 @@ public final class Consul: Sendable {
         }
 
         func request(method requestMethod: HTTPMethod, uri requestURI: String, body requestBody: ByteBuffer?, handler: some ConsulResponseHandler) {
-            Consul.logger.debug("Request \(requestMethod) '\(requestURI)'")
+            Consul.logger.trace("Request \(requestMethod) '\(requestURI)'")
             ClientBootstrap(group: eventLoopGroup)
                 .channelInitializer { channel in
                     channel.pipeline.addHTTPClientHandlers(position: .first, leftOverBytesStrategy: .fireError).flatMap {
