@@ -18,7 +18,8 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/apple/swift-nio.git", .upToNextMajor(from: "2.49.0")),
         .package(url: "https://github.com/apple/swift-service-discovery.git", .upToNextMajor(from: "1.2.0")),
-        .package(url: "https://github.com/swift-extras/swift-extras-json.git", .upToNextMajor(from: "0.6.0"))
+        .package(url: "https://github.com/swift-extras/swift-extras-json.git", .upToNextMajor(from: "0.6.0")),
+        .package(url: "https://github.com/apple/swift-log", .upToNextMajor(from: "1.0.0"))
     ],
     targets: [
         .target(
@@ -28,6 +29,7 @@ let package = Package(
                 .product(name: "NIOHTTP1", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "ServiceDiscovery", package: "swift-service-discovery"),
+                .product(name: "Logging", package: "swift-log"),
             ],
             swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
         ),
