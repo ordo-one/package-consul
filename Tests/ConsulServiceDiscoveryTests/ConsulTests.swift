@@ -27,6 +27,7 @@ final class ConsulTests: XCTestCase {
     }
 
     func testHealthCheckError() async throws {
+        // Try to update health status for service which has not been registered.
         let consul = Consul()
 
         let serviceName = "test_service"
