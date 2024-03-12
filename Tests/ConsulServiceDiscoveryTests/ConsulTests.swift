@@ -51,7 +51,7 @@ final class ConsulTests: XCTestCase {
                 XCTFail("check update unexpectedly succeeded")
             case let .failure(error):
                 if let error = error as? ConsulError,
-                   case let .responseError(responseStatus) = error,
+                   case let .httpResponseError(responseStatus) = error,
                    responseStatus == .notFound {
                     // expected error
                 } else {
