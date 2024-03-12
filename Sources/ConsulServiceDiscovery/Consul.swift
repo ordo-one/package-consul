@@ -7,6 +7,7 @@ import NIOPosix
 
 public enum ConsulError: Error {
     case failedToConnect(String)
+    case httpResponseError(HTTPResponseStatus)
     case error(String)
 }
 
@@ -57,6 +58,7 @@ public final class Consul: Sendable {
         /// [apidoc]: https://www.consul.io/api/agent/service.html#register-service
         ///
         public func registerService(_ service: Service) -> EventLoopFuture<Void> {
+            impl.logger.debug("register service \(service.id)")
             let promise = impl.makePromise(of: Void.self)
             do {
                 let data = try XJSONEncoder().encode(service)
@@ -399,27 +401,31 @@ public final class Consul: Sendable {
         public let wait: String?
     }
 
-    public static let logger = Logger(label: "consul")
-
     private let impl: Impl
 
     public let agent: Agent
     public let catalog: Catalog
     public let kv: KV
 
+    public var logLevel: Logger.Level {
+        get { impl.logger.logLevel }
+        set { impl.logger.logLevel = newValue }
+    }
+
     fileprivate final class Impl: Sendable {
         let serverHost: String
         let serverPort: Int
         let eventLoopGroup: EventLoopGroup
+        var logger: Logger
 
         init(_ serverHost: String, _ serverPort: Int, _ eventLoopGroup: EventLoopGroup) {
             self.serverHost = serverHost
             self.serverPort = serverPort
             self.eventLoopGroup = eventLoopGroup
+            self.logger = Logger(label: "consul")
         }
 
         func request(method requestMethod: HTTPMethod, uri requestURI: String, body requestBody: ByteBuffer?, handler: some ConsulResponseHandler) {
-            Consul.logger.trace("Request \(requestMethod) '\(requestURI)'")
             ClientBootstrap(group: eventLoopGroup)
                 .channelInitializer { channel in
                     channel.pipeline.addHTTPClientHandlers(position: .first, leftOverBytesStrategy: .fireError).flatMap {
@@ -428,7 +434,8 @@ public final class Consul: Sendable {
                                                                 requestMethod: requestMethod,
                                                                 requestURI: requestURI,
                                                                 requestBody: requestBody,
-                                                                handler: handler))
+                                                                handler: handler,
+                                                                self.logger))
                     }
                 }
                 .connect(host: serverHost, port: serverPort)
@@ -520,19 +527,21 @@ private class HTTPHandler: ChannelInboundHandler {
     private let handler: any ConsulResponseHandler
     private var responseBody: ByteBuffer?
     private var consulIndex: Int?
+    private let logger: Logger
 
-    init(_ serverHost: String, _ serverPort: Int, requestMethod: HTTPMethod, requestURI: String, requestBody: ByteBuffer?, handler: any ConsulResponseHandler) {
+    init(_ serverHost: String, _ serverPort: Int, requestMethod: HTTPMethod, requestURI: String, requestBody: ByteBuffer?, handler: any ConsulResponseHandler, _ logger: Logger) {
         self.serverHost = serverHost
         self.serverPort = serverPort
         self.requestMethod = requestMethod
         self.requestURI = requestURI
         self.requestBody = requestBody
-        responseBody = ByteBuffer()
+        self.responseBody = ByteBuffer()
         self.handler = handler
+        self.logger = logger
     }
 
     func channelActive(context: ChannelHandlerContext) {
-        Consul.logger.trace("\(logPrefix(context: context)): channelActive")
+        logger.trace("\(logPrefix(context: context)): channelActive")
 
         var headers = HTTPHeaders()
         headers.add(name: "Host", value: "\(serverHost):\(serverPort)")
@@ -552,7 +561,7 @@ private class HTTPHandler: ChannelInboundHandler {
     }
 
     func channelInactive(context: ChannelHandlerContext) {
-        Consul.logger.trace("\(logPrefix(context: context)): channelInactive")
+        logger.trace("\(logPrefix(context: context)): channelInactive")
         if responseBody != nil {
             handler.fail(ConsulError.error("Unexpected connection closed"))
             responseBody = nil
@@ -563,7 +572,7 @@ private class HTTPHandler: ChannelInboundHandler {
         let response = unwrapInboundIn(data)
         switch response {
         case let .head(responseHead):
-            Consul.logger.trace("\(logPrefix(context: context)): channelRead: head: \(responseHead))")
+            logger.trace("\(logPrefix(context: context)): channelRead: head: \(responseHead))")
 
             // store consul index from the header to propagate later to the response handler
             if let consulIndex = responseHead.headers.first(name: "X-Consul-Index") {
@@ -575,15 +584,15 @@ private class HTTPHandler: ChannelInboundHandler {
                 if responseHead.status == .ok {
                     handler.processResponse(ByteBuffer(), withIndex: consulIndex)
                 } else {
-                    handler.fail(ConsulError.error("\(responseHead.status)"))
+                    handler.fail(ConsulError.httpResponseError(responseHead.status))
                 }
                 responseBody = nil
             }
         case var .body(buffer):
-            Consul.logger.trace("\(logPrefix(context: context)): channelRead: body \(buffer.readableBytes) bytes")
+            logger.trace("\(logPrefix(context: context)): channelRead: body \(buffer.readableBytes) bytes")
             responseBody?.writeBuffer(&buffer)
         case .end:
-            Consul.logger.trace("\(logPrefix(context: context)): channelRead: end, close channel")
+            logger.trace("\(logPrefix(context: context)): channelRead: end, close channel")
             if let responseBody {
                 handler.processResponse(responseBody, withIndex: consulIndex)
                 self.responseBody = nil
@@ -600,7 +609,7 @@ private class HTTPHandler: ChannelInboundHandler {
     }
 
     func errorCaught(context: ChannelHandlerContext, error: Error) {
-        Consul.logger.debug("\(logPrefix(context: context)): \(error)")
+        logger.debug("\(logPrefix(context: context)): \(error)")
         if responseBody != nil {
             handler.fail(error)
             responseBody = nil

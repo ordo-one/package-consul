@@ -7,18 +7,17 @@ public struct Service: Codable {
     /// `healthSyncContainers`.
     let checks: [Check]?
     /// Specifies a unique ID for this service.
-    let id: String?
+    let id: String
     /// Key-value pairs of metadata to include for the Consul service.
     let meta: [String: String]?
-    /// The name the service will be registered as in Consul. Defaults to the Task family name if
-    /// empty or null.
-    let name: String?
+    /// The name the service will be registered as in Consul.
+    let name: String
     /// Port the application listens on, if any.
     let port: Int?
     /// List of string values that can be used to add service-level labels.
     let tags: [String]?
 
-    public init(address: String? = nil, checks: [Check]? = nil, id: String? = nil, meta: [String: String]? = nil, name: String? = nil, port: Int? = nil, tags: [String]? = nil) {
+    public init(address: String? = nil, checks: [Check]? = nil, id: String, meta: [String: String]? = nil, name: String, port: Int? = nil, tags: [String]? = nil) {
         self.address = address
         self.checks = checks
         self.id = id
@@ -45,7 +44,7 @@ public struct Check: Codable {
     /// Specifies that checks associated with a service should deregister after this time.
     let deregisterCriticalServiceAfter: String?
     /// The name of the check.
-    let name: String?
+    let name: String
     /// Specifies the initial status the health check.
     let status: Status?
     /// Specifies a timeout for outgoing connections. Applies to script, HTTP, TCP, UDP, and gRPC
@@ -54,7 +53,7 @@ public struct Check: Codable {
     /// Specifies this is a TTL check. Must be a duration string, such as `10s` or `5m`.
     let ttl: String?
 
-    public init(checkID: String? = nil, deregisterCriticalServiceAfter: String? = nil, name: String? = nil, status: Status? = nil, timeout: String? = nil, ttl: String? = nil) {
+    public init(checkID: String? = nil, deregisterCriticalServiceAfter: String? = nil, name: String, status: Status? = nil, timeout: String? = nil, ttl: String? = nil) {
         self.checkID = checkID
         self.deregisterCriticalServiceAfter = deregisterCriticalServiceAfter
         self.name = name

@@ -45,10 +45,10 @@ final class ConsulServiceDiscoveryTests: XCTestCase {
 
         try lookupDone.futureResult.wait()
 
-        let deregisterFuture1 = consul.agent.deregisterServiceID(service1.id!)
+        let deregisterFuture1 = consul.agent.deregisterServiceID(service1.id)
         try deregisterFuture1.wait()
 
-        let deregisterFuture2 = consul.agent.deregisterServiceID(service2.id!)
+        let deregisterFuture2 = consul.agent.deregisterServiceID(service2.id)
         try deregisterFuture2.wait()
 
         try eventLoopGroup.syncShutdownGracefully()
@@ -99,7 +99,7 @@ final class ConsulServiceDiscoveryTests: XCTestCase {
         try done.futureResult.wait()
         cancellationToken.cancel()
 
-        let deregisterFuture = consul.agent.deregisterServiceID(service.id!)
+        let deregisterFuture = consul.agent.deregisterServiceID(service.id)
         try deregisterFuture.wait()
 
         try eventLoopGroup.syncShutdownGracefully()
