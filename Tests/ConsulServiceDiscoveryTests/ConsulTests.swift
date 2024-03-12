@@ -36,10 +36,7 @@ final class ConsulTests: XCTestCase {
 
         let checkID = "service:\(serviceID)"
         let future = consul.agent.check(checkID, status: .passing)
-
-        var continuation: AsyncStream<Result<Void, Error>>.Continuation?
-        let stream = AsyncStream<Result<Void, Error>>() { continuation = $0 }
-        guard let continuation else { fatalError("continuation unexpectedly nil") }
+        let (stream, continuation) = AsyncStream.makeStream(of: Result<Void, Error>.self)
 
         future.whenComplete { result in
             continuation.yield(result)
