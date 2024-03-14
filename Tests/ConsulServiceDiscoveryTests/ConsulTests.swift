@@ -8,7 +8,7 @@ final class ConsulTests: XCTestCase {
 
         let serviceName = "test_service"
         let processInfo = ProcessInfo.processInfo
-        let serviceID = "\(processInfo.hostName)-\(processInfo.processIdentifier)-\(serviceName)"
+        let serviceID = "\(processInfo.hostName)-\(processInfo.processIdentifier)-\(serviceName)-\(#line)"
 
         let check = Check(deregisterCriticalServiceAfter: "1m", name: "\(serviceName)-health-check", status: .passing, ttl: "30s")
         let service = Service(checks: [check], id: serviceID, name: serviceName, port: 12_345)
@@ -22,6 +22,41 @@ final class ConsulTests: XCTestCase {
 
         let deregisterFuture = consul.agent.deregisterServiceID(serviceID)
         try deregisterFuture.wait()
+
+        try consul.syncShutdown()
+    }
+
+    func testHealthCheckError() async throws {
+        // Try to update health status for service which has not been registered.
+        let consul = Consul()
+
+        let serviceName = "test_service"
+        let processInfo = ProcessInfo.processInfo
+        let serviceID = "\(processInfo.hostName)-\(processInfo.processIdentifier)-\(serviceName)-\(#line)"
+
+        let checkID = "service:\(serviceID)"
+        let future = consul.agent.check(checkID, status: .passing)
+        let (stream, continuation) = AsyncStream.makeStream(of: Result<Void, Error>.self)
+
+        future.whenComplete { result in
+            continuation.yield(result)
+        }
+
+        for await result in stream {
+            switch result {
+            case .success:
+                XCTFail("check update unexpectedly succeeded")
+            case let .failure(error):
+                if let error = error as? ConsulError,
+                   case let .httpResponseError(responseStatus) = error,
+                   responseStatus == .notFound {
+                    // expected error
+                } else {
+                    XCTFail("unexpected error \(error)")
+                }
+            }
+            break
+        }
 
         try consul.syncShutdown()
     }
