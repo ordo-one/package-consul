@@ -39,36 +39,60 @@ public struct Service: Codable {
 }
 
 public struct Check: Codable {
+    /// Specifies a body that should be sent with HTTP checks.
+    let body: String?
     /// The unique ID for this check on the node. Defaults to the check `name`.
     let checkID: String?
     /// Specifies that checks associated with a service should deregister after this time.
     let deregisterCriticalServiceAfter: String?
+    /// Specifies an HTTP check to perform a GET request against the value of HTTP (expected to be a URL) every Interval.
+    let http: String?
+    /// Specifies the frequency at which to run this check. This is required for HTTP, TCP, and UDP checks.
+    let interval: String?
+    /// Specifies a different HTTP method to be used for an HTTP check. When no value is specified, GET is used.
+    let method: String?
     /// The name of the check.
     let name: String
     /// Specifies the initial status the health check.
     let status: Status?
+    /// Specifies a TCP to connect against the value of TCP (expected to be an IP or hostname plus port combination) every Interval.
+    let tcp: String?
     /// Specifies a timeout for outgoing connections. Applies to script, HTTP, TCP, UDP, and gRPC
     /// checks. Must be a duration string, such as `10s` or `5m`.
     let timeout: String?
     /// Specifies this is a TTL check. Must be a duration string, such as `10s` or `5m`.
     let ttl: String?
+    /// Specifies a UDP IP address/hostname and port. The check sends datagrams to the value specified at the interval specified in the Interval configuration.
+    let udp: String?
 
-    public init(checkID: String? = nil, deregisterCriticalServiceAfter: String? = nil, name: String, status: Status? = nil, timeout: String? = nil, ttl: String? = nil) {
+    public init(body: String? = nil, checkID: String? = nil, deregisterCriticalServiceAfter: String? = nil, http: String? = nil, interval: String? = nil, method: String? = nil, name: String, status: Status? = nil, tcp: String? = nil, timeout: String? = nil, ttl: String? = nil, udp: String? = nil) {
+        self.body = body
         self.checkID = checkID
         self.deregisterCriticalServiceAfter = deregisterCriticalServiceAfter
+        self.http = http
+        self.interval = interval
+        self.method = method
         self.name = name
         self.status = status
+        self.tcp = tcp
         self.timeout = timeout
         self.ttl = ttl
+        self.udp = udp
     }
 
     enum CodingKeys: String, CodingKey {
+        case body = "Body"
         case checkID = "CheckID"
         case deregisterCriticalServiceAfter = "DeregisterCriticalServiceAfter"
+        case http = "HTTP"
+        case interval = "Interval"
+        case method = "Method"
         case name = "Name"
         case status = "Status"
+        case tcp = "tcp"
         case timeout = "Timeout"
         case ttl = "TTL"
+        case udp = "UDP"
     }
 }
 
