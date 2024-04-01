@@ -16,9 +16,18 @@ final class ConsulTests: XCTestCase {
         let registerFuture = consul.agent.registerService(service)
         try registerFuture.wait()
 
-        let servicesFuture = consul.catalog.services()
-        let services = try servicesFuture.wait()
-        XCTAssertTrue(services.contains(where: { $0 == serviceName }))
+        do {
+            let servicesFuture = consul.catalog.services()
+            let services = try servicesFuture.wait()
+            XCTAssertTrue(services.contains(where: { $0 == serviceName }))
+        }
+
+        do {
+            let nodesFuture = consul.catalog.nodes(withService: serviceName)
+            let (_, services) = try nodesFuture.wait()
+            let service = services.first(where: { ($0.serviceName == serviceName) && ($0.serviceID == serviceID) })
+            XCTAssertNotNil(service)
+        }
 
         let deregisterFuture = consul.agent.deregisterServiceID(serviceID)
         try deregisterFuture.wait()

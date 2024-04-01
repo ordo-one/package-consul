@@ -114,8 +114,9 @@ public struct NodeService: Hashable, Decodable, Sendable {
     public let serviceMeta: [String: String]?
     public let serviceName: String?
     public let servicePort: Int?
+    public let taggedAddresses: [String: String]?
 
-    public init(address: String? = nil, createIndex: Int? = nil, datacenter: String? = nil, id: String? = nil, modifyIndex: Int? = nil, node: String? = nil, serviceAddress: String? = nil, serviceID: String, serviceMeta: [String: String]? = nil, serviceName: String? = nil, servicePort: Int? = nil) {
+    public init(address: String? = nil, createIndex: Int? = nil, datacenter: String? = nil, id: String? = nil, modifyIndex: Int? = nil, node: String? = nil, serviceAddress: String? = nil, serviceID: String, serviceMeta: [String: String]? = nil, serviceName: String? = nil, servicePort: Int? = nil, taggedAddresses: [String: String]? = nil) {
         self.address = address
         self.createIndex = createIndex
         self.datacenter = datacenter
@@ -127,6 +128,7 @@ public struct NodeService: Hashable, Decodable, Sendable {
         self.serviceMeta = serviceMeta
         self.serviceName = serviceName
         self.servicePort = servicePort
+        self.taggedAddresses = taggedAddresses
     }
 
     public enum CodingKeys: String, CodingKey {
@@ -141,6 +143,7 @@ public struct NodeService: Hashable, Decodable, Sendable {
         case serviceMeta = "ServiceMeta"
         case serviceName = "ServiceName"
         case servicePort = "ServicePort"
+        case taggedAddresses = "TaggedAddresses"
     }
 }
 
