@@ -160,7 +160,7 @@ public final class Consul: Sendable {
         /// - Parameters
         ///    - datacenter: Specifies the datacenter to query. This will default to the datacenter of the agent being queried.
         ///    - serviceName: Specifies the name of the service for which to list nodes.
-        /// - Returns: EventLoopFuture<[NodeService]> to deliver result
+        /// - Returns: EventLoopFuture<(Int, [NodeService])> to deliver result where first element of tuple is value of "X-Consul-Index" from HTTP header
         /// [apidoc]: https://developer.hashicorp.com/consul/api-docs/catalog#list-nodes-for-service
         ///
         public func nodes(inDatacenter datacenter: String? = nil,
