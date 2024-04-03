@@ -11,12 +11,14 @@ public enum ConsulError: Error {
     case error(String)
 }
 
-private protocol ConsulResponseHandler: Sendable {
+protocol ConsulResponseHandler: Sendable {
     func processResponse(_ buffer: ByteBuffer, withIndex: Int?)
     func fail(_ error: Error)
 }
 
 public final class Consul: Sendable {
+    static let reconnectInterval: TimeAmount = .seconds(5)
+
     public static var defaultHost: String {
         let defaultHost = "127.0.0.1"
 
@@ -401,7 +403,7 @@ public final class Consul: Sendable {
         public let wait: String?
     }
 
-    private let impl: Impl
+    let impl: Impl
 
     public let agent: Agent
     public let catalog: Catalog
@@ -412,7 +414,7 @@ public final class Consul: Sendable {
         set { impl.logger.logLevel = newValue }
     }
 
-    fileprivate final class Impl: Sendable {
+    final class Impl: Sendable {
         let serverHost: String
         let serverPort: Int
         let eventLoopGroup: EventLoopGroup

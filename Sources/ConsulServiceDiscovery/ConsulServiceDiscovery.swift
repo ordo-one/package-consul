@@ -45,6 +45,14 @@ public final class ConsulServiceDiscovery: ServiceDiscovery, Sendable {
                                    polling: poll)
                 case let .failure(error):
                     nextResultHandler(.failure(error))
+                    let eventLoop = self.consul.impl.eventLoopGroup.next()
+                    _ = eventLoop.scheduleTask(in: Consul.reconnectInterval) {
+                        self.subscribe(to: service,
+                                       onNext: nextResultHandler,
+                                       onCompletion: completionHandler,
+                                       cancellationToken: cancellationToken,
+                                       polling: nil)
+                    }
                 }
             }
         }
