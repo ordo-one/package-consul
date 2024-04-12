@@ -8,6 +8,7 @@ import NIOPosix
 public enum ConsulError: Error {
     case failedToConnect(String)
     case httpResponseError(HTTPResponseStatus)
+    case failedToDecodeValue(String)
     case error(String)
 }
 
@@ -323,7 +324,23 @@ public final class Consul: Sendable {
                     do {
                         let values = try XJSONDecoder().decode([Value].self, from: bytes)
                         if values.count > 0 {
-                            promise.succeed(values[0])
+                            let value = values[0]
+                            if let valueValue = value.value {
+                                if let data = Data(base64Encoded: valueValue), let str = String(data: data, encoding: .utf8) {
+                                    let result = Value(flags: value.flags,
+                                                       key: value.key,
+                                                       value: str,
+                                                       createIndex: value.createIndex,
+                                                       modifyIndex: value.modifyIndex,
+                                                       lockIndex: value.lockIndex)
+                                    promise.succeed(result)
+                                } else {
+                                    promise.fail(ConsulError.failedToDecodeValue(valueValue))
+                                }
+                            } else {
+                                // nothing to decode
+                                promise.succeed(value)
+                            }
                         } else {
                             promise.fail(ConsulError.error("Empty array received"))
                         }
