@@ -97,9 +97,7 @@ final class ConsulTests: XCTestCase {
         let value = try future3.wait()
 
         let valueValue = try XCTUnwrap(value.value, "value is unexpectedly empty")
-        let data = try XCTUnwrap(Data(base64Encoded: valueValue), "can't decode value")
-        let str = try XCTUnwrap(String(data: data, encoding: .utf8), "can't construct string")
-        XCTAssertEqual(str, testValue)
+        XCTAssertEqual(valueValue, testValue)
 
         let future4 = consul.kv.removeValue(forKey: testKey)
         try future4.wait()
