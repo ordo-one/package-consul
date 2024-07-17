@@ -1,5 +1,6 @@
 @testable import ConsulServiceDiscovery
 import NIOPosix
+import class NIOCore.EventLoopFuture
 import XCTest
 
 final class ConsulTests: XCTestCase {
@@ -94,9 +95,9 @@ final class ConsulTests: XCTestCase {
         XCTAssertTrue(keys2.contains(where: { $0 == testKey }))
 
         let future3 = consul.kv.valueForKey(testKey)
-        let value = try future3.wait()
+        let value = try XCTUnwrap(future3.wait(), "value is unexpectedly empty")
 
-        let valueValue = try XCTUnwrap(value.value, "value is unexpectedly empty")
+        let valueValue = try XCTUnwrap(value.value, "value.value is unexpectedly empty")
         XCTAssertEqual(valueValue, testValue)
 
         let future4 = consul.kv.removeValue(forKey: testKey)
@@ -105,6 +106,17 @@ final class ConsulTests: XCTestCase {
         let future5 = consul.kv.keys()
         let keys5 = try future5.wait()
         XCTAssertFalse(keys5.contains(where: { $0 == testKey }))
+
+        try consul.syncShutdown()
+    }
+
+    func testKVDoesNotExist() throws {
+        let consul = Consul()
+
+        let testKey = "test-key-does-not-exist"
+        let future1 = consul.kv.valueForKey(testKey)
+        let value = try future1.wait()
+        XCTAssertEqual(value, nil)
 
         try consul.syncShutdown()
     }

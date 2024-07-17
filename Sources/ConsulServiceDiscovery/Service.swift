@@ -149,7 +149,7 @@ public struct NodeService: Hashable, Decodable, Sendable {
 
 public struct Value: Hashable, Decodable, Sendable {
     public let flags: Int?
-    public let key: String?
+    public let key: String
     public let value: String?
     public let createIndex: Int?
     public let modifyIndex: Int?

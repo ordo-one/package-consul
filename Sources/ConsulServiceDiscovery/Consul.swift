@@ -305,18 +305,23 @@ public final class Consul: Sendable {
         /// - Parameters
         ///    - key: specifies the path of the key
         ///    - datacenter: Specifies the datacenter to query. This will default to the datacenter of the agent being queried.
-        /// - Returns: EventLoopFuture<Value> to deliver result
+        /// - Returns: EventLoopFuture<Value?> to deliver result, future will sucess with 'nil' if key does not exist
         /// [apidoc]: https://developer.hashicorp.com/consul/api-docs/kv#read-key
         ///
-        public func valueForKey(_ key: String, inDatacenter datacenter: String? = nil) -> EventLoopFuture<Value> {
+        public func valueForKey(_ key: String, inDatacenter datacenter: String? = nil) -> EventLoopFuture<Value?> {
             struct ResponseHandler: ConsulResponseHandler {
-                private let promise: EventLoopPromise<Value>
+                private let promise: EventLoopPromise<Value?>
 
-                init(_ promise: EventLoopPromise<Value>) {
+                init(_ promise: EventLoopPromise<Value?>) {
                     self.promise = promise
                 }
 
                 func processResponse(_ buffer: ByteBuffer, withIndex: Int?) {
+                    if buffer.readableBytes == 0 {
+                        promise.succeed(nil)
+                        return
+                    }
+
                     guard let bytes = buffer.getBytes(at: buffer.readerIndex, length: buffer.readableBytes) else {
                         fatalError("Internal error: bytes unexpectedly nil")
                     }
@@ -369,7 +374,7 @@ public final class Consul: Sendable {
                 components.queryItems = queryItems
             }
 
-            let promise = impl.makePromise(of: Value.self)
+            let promise = impl.makePromise(of: Value?.self)
             if let requestURI = components.string {
                 impl.request(method: .GET, uri: requestURI, body: nil, handler: ResponseHandler(promise))
             } else {
