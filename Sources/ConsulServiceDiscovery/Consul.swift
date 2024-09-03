@@ -427,6 +427,9 @@ public final class Consul: Sendable {
 
     let impl: Impl
 
+    public var serverHost: String { impl.serverHost }
+    public var serverPort: Int { impl.serverPort }
+
     public let agent: Agent
     public let catalog: Catalog
     public let kv: KV
