@@ -105,14 +105,14 @@ public final class Consul: Sendable {
         }
 
         /// Deregister check
-        /// - Parameter check: check description
+        /// - Parameter checkId: check identifier
         /// - Returns: EventLoopFuture<Void> to deliver result
         /// [apidoc] https://developer.hashicorp.com/consul/api-docs/agent/check#deregister-check
         ///
         public func deregisterCheck(_ checkId: String) -> EventLoopFuture<Void> {
             impl.logger.debug("deregister check \(checkId)")
             let promise = impl.makePromise(of: Void.self)
-            let uri = "/v1/agent/check/register/\(checkId)"
+            let uri = "/v1/agent/check/deregister/\(checkId)"
             impl.request(method: .PUT, uri: uri, body: nil, handler: ResponseHandlerVoid(promise))
             return promise.futureResult
         }
@@ -500,7 +500,7 @@ public final class Consul: Sendable {
                     self.promise = promise
                 }
 
-                func processResponse(_ buffer: ByteBuffer, withIndex: Int?) {
+                func processResponse(_ buffer: ByteBuffer, withIndex _: Int?) {
                     guard let bytes = buffer.getBytes(at: buffer.readerIndex, length: buffer.readableBytes) else {
                         fatalError("Internal error: bytes unexpectedly nil")
                     }
