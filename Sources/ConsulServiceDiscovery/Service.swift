@@ -154,13 +154,71 @@ public struct Value: Hashable, Decodable, Sendable {
     public let createIndex: Int?
     public let modifyIndex: Int?
     public let lockIndex: Int?
+    public let session: String?
 
-    public enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey {
         case flags = "Flags"
         case key = "Key"
         case value = "Value"
         case createIndex = "CreateIndex"
         case modifyIndex = "ModifyIndex"
         case lockIndex = "LockIndex"
+        case session = "Session"
+    }
+}
+
+public struct Session: Codable, Sendable {
+    public struct ServiceCheck: Codable, Sendable {
+        public let id: String
+        public let namespace: String?
+
+        init(_ id: String, namespace: String? = nil) {
+            self.id = id
+            self.namespace = namespace
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case id = "ID"
+            case namespace = "Namespace"
+        }
+    }
+
+    public let behavior: String?
+    public let id: String?
+    public let lockDelay: String?
+    public let name: String?
+    public let node: String?
+    public let nodeChecks: [String]?
+    public let serviceChecks: [ServiceCheck]?
+    public let ttl: String? // minimum TTL is 10 seconds
+
+    public let createIndex: String?
+    public let modifyIndex: String?
+
+    public init(behavior: String? = nil, lockDelay: String? = nil, name: String? = nil, nodeChecks: [String]? = nil, serviceChecks: [ServiceCheck]? = nil, ttl: String? = nil) {
+        self.behavior = behavior
+        self.id = nil
+        self.lockDelay = lockDelay
+        self.name = name
+        self.node = nil
+        self.nodeChecks = nodeChecks
+        self.serviceChecks = serviceChecks
+        self.ttl = ttl
+        self.createIndex = nil
+        self.modifyIndex = nil
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case behavior = "Behavior"
+        case id = "ID"
+        case lockDelay = "LockDelay"
+        case name = "Name"
+        case node = "Node"
+        case nodeChecks = "NodeChecks"
+        case serviceChecks = "ServiceChecks"
+        case ttl = "TTL"
+
+        case createIndex = "CreateIndex"
+        case modifyIndex = "ModifyIndex"
     }
 }
