@@ -123,7 +123,7 @@ final class ConsulTests: XCTestCase {
 
     func testKVLock() throws {
         let pid = ProcessInfo.processInfo.processIdentifier
-        let consul = Consul(host: "linux-dev")
+        let consul = Consul()
 
         let session1 = Session(lockDelay: "1s", ttl: "10s")
         let session1Future = consul.session.create(session1)
