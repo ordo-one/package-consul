@@ -605,6 +605,35 @@ public final class Consul: Sendable {
                 return impl.makeFailedFuture(ConsulError.error("Can not build Consul API request string"))
             }
         }
+
+        /// Renew existing sessions
+        /// - Parameters
+        ///    - id: session identifier
+        ///    - datacenter: Specifies the datacenter to query. This will default to the datacenter of the agent being queried.
+        /// - Returns: EventLoopFuture<Session> to deliver result
+        /// [apidoc]: https://developer.hashicorp.com/consul/api-docs/session#renew-session
+        ///
+        public func renew(_ id: String, inDatacenter datacenter: String? = nil) -> EventLoopFuture<Session> {
+            var components = URLComponents()
+            components.path = "/v1/session/renew/\(id)"
+
+            var queryItems = [URLQueryItem]()
+            if let datacenter, !datacenter.isEmpty {
+                queryItems.append(URLQueryItem(name: "dc", value: datacenter))
+            }
+
+            if !queryItems.isEmpty {
+                components.queryItems = queryItems
+            }
+
+            if let requestURI = components.string {
+                let promise = impl.makePromise(of: [Session].self)
+                impl.request(method: .PUT, uri: requestURI, body: nil, handler: ResponseHandler(promise))
+                return promise.futureResult.map { $0[0] }
+            } else {
+                return impl.makeFailedFuture(ConsulError.error("Can not build Consul API request string"))
+            }
+        }
     }
 
     public struct Poll {

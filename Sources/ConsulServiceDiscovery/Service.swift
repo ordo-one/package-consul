@@ -183,22 +183,52 @@ public struct Session: Codable, Sendable {
         }
     }
 
+    // LockDelay parameter for session create request is string,
+    // but for session read/renew/list is an integer.
+    // weird...
+    public struct LockDelay: Codable, Sendable {
+        public let ns: Int
+
+        public init(_ ns: Int) {
+            self.ns = ns
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            let nanosecondsInSecond = 1_000_000_000
+            var seconds = (ns / nanosecondsInSecond)
+            if (ns % nanosecondsInSecond) > 0 {
+                seconds += 1
+            }
+            var container = encoder.singleValueContainer()
+            try container.encode("\(seconds)s")
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            ns = try container.decode(Int.self)
+        }
+    }
+
     public let behavior: String?
     public let id: String?
-    public let lockDelay: String?
+    public let lockDelay: LockDelay?
     public let name: String?
     public let node: String?
     public let nodeChecks: [String]?
     public let serviceChecks: [ServiceCheck]?
     public let ttl: String? // minimum TTL is 10 seconds
 
-    public let createIndex: String?
-    public let modifyIndex: String?
+    public let createIndex: Int?
+    public let modifyIndex: Int?
 
-    public init(behavior: String? = nil, lockDelay: String? = nil, name: String? = nil, nodeChecks: [String]? = nil, serviceChecks: [ServiceCheck]? = nil, ttl: String? = nil) {
+    public init(behavior: String? = nil, lockDelay: Int? = nil, name: String? = nil, nodeChecks: [String]? = nil, serviceChecks: [ServiceCheck]? = nil, ttl: String? = nil) {
         self.behavior = behavior
         self.id = nil
-        self.lockDelay = lockDelay
+        if let lockDelay {
+            self.lockDelay = .init(lockDelay)
+        } else {
+            self.lockDelay = nil
+        }
         self.name = name
         self.node = nil
         self.nodeChecks = nodeChecks
