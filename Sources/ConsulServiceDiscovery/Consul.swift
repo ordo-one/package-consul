@@ -490,7 +490,7 @@ public final class Consul: Sendable {
         ///    - session: session to create
         ///    - datacenter: Specifies the datacenter to query. This will default to the datacenter of the agent being queried.
         /// - Returns: EventLoopFuture<String> to deliver result
-        /// [apidoc]: https://developer.hashicorp.com/consul/api-docs/kv#create-update-key
+        /// [apidoc]: https://developer.hashicorp.com/consul/api-docs/session#create-session
         ///
         public func create(_ session: Session, inDatacenter datacenter: String? = nil) -> EventLoopFuture<String> {
             struct ResponseHandler: ConsulResponseHandler {
@@ -549,6 +549,13 @@ public final class Consul: Sendable {
             }
         }
 
+        /// Destroys existing session
+        /// - Parameters
+        ///    - id: identifier of the session to destroy
+        ///    - datacenter: Specifies the datacenter to query. This will default to the datacenter of the agent being queried.
+        /// - Returns: EventLoopFuture<Bool> to deliver result
+        /// [apidoc]: https://developer.hashicorp.com/consul/api-docs/session#delete-session
+        ///
         public func destroy(_ id: String, inDatacenter datacenter: String? = nil) -> EventLoopFuture<Bool> {
             var components = URLComponents()
             components.path = "/v1/session/destroy/\(id)"
@@ -571,6 +578,12 @@ public final class Consul: Sendable {
             }
         }
 
+        /// List existing sessions
+        /// - Parameters
+        ///    - datacenter: Specifies the datacenter to query. This will default to the datacenter of the agent being queried.
+        /// - Returns: EventLoopFuture<[Session]> to deliver result
+        /// [apidoc]: https://developer.hashicorp.com/consul/api-docs/session#list-sessions
+        ///
         public func list(inDatacenter datacenter: String? = nil) -> EventLoopFuture<[Session]> {
             var components = URLComponents()
             components.path = "/v1/session/list"
