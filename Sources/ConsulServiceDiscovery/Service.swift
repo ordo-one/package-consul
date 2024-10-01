@@ -224,11 +224,7 @@ public struct Session: Codable, Sendable {
     public init(behavior: String? = nil, lockDelay: Int? = nil, name: String? = nil, nodeChecks: [String]? = nil, serviceChecks: [ServiceCheck]? = nil, ttl: String? = nil) {
         self.behavior = behavior
         self.id = nil
-        if let lockDelay {
-            self.lockDelay = .init(lockDelay)
-        } else {
-            self.lockDelay = nil
-        }
+        self.lockDelay = lockDelay.map { .init($0) }
         self.name = name
         self.node = nil
         self.nodeChecks = nodeChecks
