@@ -306,6 +306,8 @@ public final class Consul: Sendable {
         ///    - value: value to store
         ///    - key: specifies the path of the key
         ///    - datacenter: Specifies the datacenter to query. This will default to the datacenter of the agent being queried.
+        ///    - cas: Specifies to use a Check-And-Set operation.
+        ///    - lockOp: Supply a session ID to use in a lock acquisition or releasing operation.
         /// - Returns: EventLoopFuture<Bool> to deliver result
         /// [apidoc]: https://developer.hashicorp.com/consul/api-docs/kv#create-update-key
         ///
@@ -313,6 +315,7 @@ public final class Consul: Sendable {
             _ value: String,
             forKey key: String,
             inDatacenter datacenter: String? = nil,
+            cas: Int? = nil,
             lockOp: LockOp? = nil
         ) -> EventLoopFuture<Bool> {
             var components = URLComponents()
@@ -321,6 +324,10 @@ public final class Consul: Sendable {
             var queryItems = [URLQueryItem]()
             if let datacenter, !datacenter.isEmpty {
                 queryItems.append(URLQueryItem(name: "dc", value: datacenter))
+            }
+
+            if let cas {
+                queryItems.append(URLQueryItem(name: "cas", value: "\(cas)"))
             }
 
             if let lockOp {
@@ -435,6 +442,7 @@ public final class Consul: Sendable {
         /// - Parameters
         ///    - key: specifies the path of the key
         ///    - datacenter: Specifies the datacenter to query. This will default to the datacenter of the agent being queried.
+        ///    - cas: Specifies to use a Check-And-Set operation.
         ///    - recurse: Specifies to delete all keys which have the specified prefix. Without this, only a key with an exact match will be deleted.
         /// - Returns: EventLoopFuture<Bool> to deliver result
         /// [apidoc]: https://developer.hashicorp.com/consul/api-docs/kv#delete-key
@@ -442,6 +450,7 @@ public final class Consul: Sendable {
         public func removeValue(
             forKey key: String,
             inDatacenter datacenter: String? = nil,
+            cas: Int? = nil,
             recurse: Bool? = nil
         ) -> EventLoopFuture<Bool> {
             var components = URLComponents()
@@ -450,6 +459,10 @@ public final class Consul: Sendable {
             var queryItems = [URLQueryItem]()
             if let datacenter, !datacenter.isEmpty {
                 queryItems.append(URLQueryItem(name: "dc", value: datacenter))
+            }
+
+            if let cas {
+                queryItems.append(URLQueryItem(name: "cas", value: "\(cas)"))
             }
 
             if let recurse, recurse {
