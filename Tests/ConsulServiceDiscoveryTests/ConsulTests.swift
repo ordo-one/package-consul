@@ -120,4 +120,32 @@ final class ConsulTests: XCTestCase {
 
         try consul.syncShutdown()
     }
+
+    func testKVLock() throws {
+        let pid = ProcessInfo.processInfo.processIdentifier
+        let consul = Consul()
+
+        let session1 = Session(lockDelay: "1s", ttl: "10s")
+        let session1Future = consul.session.create(session1)
+        let session1Id = try session1Future.wait()
+        print("session1=\(session1Id)")
+
+        let session2 = Session(lockDelay: "1s", ttl: "10s")
+        let session2Future = consul.session.create(session2)
+        let session2Id = try session2Future.wait()
+        print("session2=\(session2Id)")
+
+        let key = "key1-\(pid)"
+        let update1Future = consul.kv.updateValue("value1", forKey: key, lockOp: .acquire(session1Id))
+        let update1Result = try update1Future.wait()
+        XCTAssertTrue(update1Result)
+
+        let update2Future = consul.kv.updateValue("value2", forKey: key, lockOp: .acquire(session2Id))
+        let update2Result = try update2Future.wait()
+        XCTAssertFalse(update2Result)
+
+        let removeValueFuture = consul.kv.removeValue(forKey: key)
+        let removeValueResult = try removeValueFuture.wait()
+        XCTAssertTrue(removeValueResult)
+    }
 }

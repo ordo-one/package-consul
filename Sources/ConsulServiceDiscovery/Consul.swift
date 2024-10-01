@@ -48,7 +48,7 @@ public final class Consul: Sendable {
         return urlPort
     }
 
-    public struct Agent: Sendable {
+    public struct AgentEndpoint: Sendable {
         private let impl: Impl
 
         fileprivate init(_ impl: Impl) {
@@ -85,6 +85,38 @@ public final class Consul: Sendable {
             return promise.futureResult
         }
 
+        /// Register check
+        /// - Parameter check: check description
+        /// - Returns: EventLoopFuture<Void> to deliver result
+        /// [apidoc] https://developer.hashicorp.com/consul/api-docs/agent/check#register-check
+        ///
+        public func registerCheck(_ check: Check) -> EventLoopFuture<Void> {
+            impl.logger.debug("register check \(check.name)")
+            do {
+                let data = try XJSONEncoder().encode(check)
+                var requestBody = ByteBufferAllocator().buffer(capacity: data.count)
+                requestBody.writeBytes(data)
+                let promise = impl.makePromise(of: Void.self)
+                impl.request(method: .PUT, uri: "/v1/agent/check/register", body: requestBody, handler: ResponseHandlerVoid(promise))
+                return promise.futureResult
+            } catch {
+                return impl.makeFailedFuture(error)
+            }
+        }
+
+        /// Deregister check
+        /// - Parameter checkId: check identifier
+        /// - Returns: EventLoopFuture<Void> to deliver result
+        /// [apidoc] https://developer.hashicorp.com/consul/api-docs/agent/check#deregister-check
+        ///
+        public func deregisterCheck(_ checkId: String) -> EventLoopFuture<Void> {
+            impl.logger.debug("deregister check \(checkId)")
+            let promise = impl.makePromise(of: Void.self)
+            let uri = "/v1/agent/check/deregister/\(checkId)"
+            impl.request(method: .PUT, uri: uri, body: nil, handler: ResponseHandlerVoid(promise))
+            return promise.futureResult
+        }
+
         /// Set the status of the check and to reset the TTL clock.
         public func check(_ checkID: String, status: Status) -> EventLoopFuture<Void> {
             var uri: String
@@ -103,7 +135,7 @@ public final class Consul: Sendable {
         }
     }
 
-    public struct Catalog: Sendable {
+    public struct CatalogEndpoint: Sendable {
         private let impl: Impl
 
         fileprivate init(_ impl: Impl) {
@@ -150,13 +182,13 @@ public final class Consul: Sendable {
                 components.queryItems = [URLQueryItem(name: "dc", value: datacenter)]
             }
 
-            let promise = impl.makePromise(of: [String].self)
             if let requestURI = components.string {
+                let promise = impl.makePromise(of: [String].self)
                 impl.request(method: .GET, uri: requestURI, body: nil, handler: ResponseHandler(promise))
+                return promise.futureResult
             } else {
-                promise.fail(ConsulError.error("Can not build Consul API request string"))
+                return impl.makeFailedFuture(ConsulError.error("Can not build Consul API request string"))
             }
-            return promise.futureResult
         }
 
         /// Returns the nodes providing a service in a given datacenter.
@@ -231,7 +263,7 @@ public final class Consul: Sendable {
         }
     }
 
-    public struct KV: Sendable {
+    public struct KeyValueEndpoint: Sendable {
         private let impl: Impl
 
         fileprivate init(_ impl: Impl) {
@@ -264,24 +296,39 @@ public final class Consul: Sendable {
             return promise.futureResult
         }
 
+        public enum LockOp {
+            case acquire(String)
+            case release(String)
+        }
+
         /// Updates the value of the specified key. If no key exists at the given path, the key will be created.
         /// - Parameters
         ///    - value: value to store
         ///    - key: specifies the path of the key
         ///    - datacenter: Specifies the datacenter to query. This will default to the datacenter of the agent being queried.
-        /// - Returns: EventLoopFuture<Void> to deliver result
+        /// - Returns: EventLoopFuture<Bool> to deliver result
         /// [apidoc]: https://developer.hashicorp.com/consul/api-docs/kv#create-update-key
         ///
-        public func updateValue(_ value: String, forKey key: String, inDatacenter datacenter: String? = nil) -> EventLoopFuture<Void> {
-            var valueData = ByteBufferAllocator().buffer(capacity: value.count)
-            valueData.writeString(value)
-
+        public func updateValue(
+            _ value: String,
+            forKey key: String,
+            inDatacenter datacenter: String? = nil,
+            lockOp: LockOp? = nil
+        ) -> EventLoopFuture<Bool> {
             var components = URLComponents()
             components.path = "/v1/kv/\(key)"
 
             var queryItems = [URLQueryItem]()
             if let datacenter, !datacenter.isEmpty {
                 queryItems.append(URLQueryItem(name: "dc", value: datacenter))
+            }
+
+            if let lockOp {
+                let queryItem = switch lockOp {
+                case .acquire(let session): URLQueryItem(name: "acquire", value: session)
+                case .release(let session): URLQueryItem(name: "release", value: session)
+                }
+                queryItems.append(queryItem)
             }
 
             if !queryItems.isEmpty {
@@ -291,9 +338,9 @@ public final class Consul: Sendable {
             var requestBody = ByteBufferAllocator().buffer(capacity: value.count)
             requestBody.writeString(value)
 
-            let promise = impl.makePromise(of: Void.self)
+            let promise = impl.makePromise(of: Bool.self)
             if let requestURI = components.string {
-                impl.request(method: .PUT, uri: requestURI, body: requestBody, handler: ResponseHandlerVoid(promise))
+                impl.request(method: .PUT, uri: requestURI, body: requestBody, handler: ResponseHandler(promise))
             } else {
                 promise.fail(ConsulError.error("Can not build Consul API request string"))
             }
@@ -337,7 +384,8 @@ public final class Consul: Sendable {
                                                        value: str,
                                                        createIndex: value.createIndex,
                                                        modifyIndex: value.modifyIndex,
-                                                       lockIndex: value.lockIndex)
+                                                       lockIndex: value.lockIndex,
+                                                       session: value.session)
                                     promise.succeed(result)
                                 } else {
                                     promise.fail(ConsulError.failedToDecodeValue(valueValue))
@@ -374,14 +422,13 @@ public final class Consul: Sendable {
                 components.queryItems = queryItems
             }
 
-            let promise = impl.makePromise(of: Value?.self)
             if let requestURI = components.string {
+                let promise = impl.makePromise(of: Value?.self)
                 impl.request(method: .GET, uri: requestURI, body: nil, handler: ResponseHandler(promise))
+                return promise.futureResult
             } else {
-                promise.fail(ConsulError.error("Can not build Consul API request string"))
+                return impl.makeFailedFuture(ConsulError.error("Can not build Consul API request string"))
             }
-
-            return promise.futureResult
         }
 
         /// Deletes a single key or all keys sharing a prefix.
@@ -389,10 +436,14 @@ public final class Consul: Sendable {
         ///    - key: specifies the path of the key
         ///    - datacenter: Specifies the datacenter to query. This will default to the datacenter of the agent being queried.
         ///    - recurse: Specifies to delete all keys which have the specified prefix. Without this, only a key with an exact match will be deleted.
-        /// - Returns: EventLoopFuture<Void> to deliver result
+        /// - Returns: EventLoopFuture<Bool> to deliver result
         /// [apidoc]: https://developer.hashicorp.com/consul/api-docs/kv#delete-key
         ///
-        public func removeValue(forKey key: String, inDatacenter datacenter: String? = nil, recurse: Bool? = nil) -> EventLoopFuture<Void> {
+        public func removeValue(
+            forKey key: String,
+            inDatacenter datacenter: String? = nil,
+            recurse: Bool? = nil
+        ) -> EventLoopFuture<Bool> {
             var components = URLComponents()
             components.path = "/v1/kv/\(key)"
 
@@ -409,14 +460,150 @@ public final class Consul: Sendable {
                 components.queryItems = queryItems
             }
 
-            let promise = impl.makePromise(of: Void.self)
             if let requestURI = components.string {
-                impl.request(method: .DELETE, uri: requestURI, body: nil, handler: ResponseHandlerVoid(promise))
+                let promise = impl.makePromise(of: Bool.self)
+                impl.request(method: .DELETE, uri: requestURI, body: nil, handler: ResponseHandler(promise))
+                return promise.futureResult
             } else {
-                promise.fail(ConsulError.error("Can not build Consul API request string"))
+                return impl.makeFailedFuture(ConsulError.error("Can not build Consul API request string"))
+            }
+        }
+    }
+
+    public struct SessionEndpoint: Sendable {
+        struct CreateResponse: Decodable {
+            let id: String
+
+            enum CodingKeys: String, CodingKey {
+                case id = "ID"
+            }
+        }
+
+        private let impl: Impl
+
+        fileprivate init(_ impl: Impl) {
+            self.impl = impl
+        }
+
+        /// Creates new session
+        /// - Parameters
+        ///    - session: session to create
+        ///    - datacenter: Specifies the datacenter to query. This will default to the datacenter of the agent being queried.
+        /// - Returns: EventLoopFuture<String> to deliver result
+        /// [apidoc]: https://developer.hashicorp.com/consul/api-docs/session#create-session
+        ///
+        public func create(_ session: Session, inDatacenter datacenter: String? = nil) -> EventLoopFuture<String> {
+            struct ResponseHandler: ConsulResponseHandler {
+                private let promise: EventLoopPromise<String>
+
+                init(_ promise: EventLoopPromise<String>) {
+                    self.promise = promise
+                }
+
+                func processResponse(_ buffer: ByteBuffer, withIndex _: Int?) {
+                    guard let bytes = buffer.getBytes(at: buffer.readerIndex, length: buffer.readableBytes) else {
+                        fatalError("Internal error: bytes unexpectedly nil")
+                    }
+
+                    do {
+                        let response = try XJSONDecoder().decode(CreateResponse.self, from: bytes)
+                        promise.succeed(response.id)
+                    } catch {
+                        guard let str = buffer.getString(at: buffer.readerIndex, length: buffer.readableBytes) else {
+                            fatalError("Internal error: failed to fetch string from the buffer")
+                        }
+                        promise.fail(ConsulError.error("Failed to decode response '\(str)': \(error)"))
+                    }
+                }
+
+                func fail(_ error: any Error) {
+                    promise.fail(error)
+                }
             }
 
-            return promise.futureResult
+            var components = URLComponents()
+            components.path = "/v1/session/create"
+
+            var queryItems = [URLQueryItem]()
+            if let datacenter, !datacenter.isEmpty {
+                queryItems.append(URLQueryItem(name: "dc", value: datacenter))
+            }
+
+            if !queryItems.isEmpty {
+                components.queryItems = queryItems
+            }
+
+            do {
+                let bytes = try XJSONEncoder().encode(session)
+                var requestBody = ByteBufferAllocator().buffer(capacity: bytes.count)
+                requestBody.writeBytes(bytes)
+                if let requestURI = components.string {
+                    let promise = impl.makePromise(of: String.self)
+                    impl.request(method: .PUT, uri: requestURI, body: requestBody, handler: ResponseHandler(promise))
+                    return promise.futureResult
+                } else {
+                    return impl.makeFailedFuture(ConsulError.error("Can not build Consul API request string"))
+                }
+            } catch {
+                return impl.makeFailedFuture(error)
+            }
+        }
+
+        /// Destroys existing session
+        /// - Parameters
+        ///    - id: identifier of the session to destroy
+        ///    - datacenter: Specifies the datacenter to query. This will default to the datacenter of the agent being queried.
+        /// - Returns: EventLoopFuture<Bool> to deliver result
+        /// [apidoc]: https://developer.hashicorp.com/consul/api-docs/session#delete-session
+        ///
+        public func destroy(_ id: String, inDatacenter datacenter: String? = nil) -> EventLoopFuture<Bool> {
+            var components = URLComponents()
+            components.path = "/v1/session/destroy/\(id)"
+
+            var queryItems = [URLQueryItem]()
+            if let datacenter, !datacenter.isEmpty {
+                queryItems.append(URLQueryItem(name: "dc", value: datacenter))
+            }
+
+            if !queryItems.isEmpty {
+                components.queryItems = queryItems
+            }
+
+            if let requestURI = components.string {
+                let promise = impl.makePromise(of: Bool.self)
+                impl.request(method: .PUT, uri: requestURI, body: nil, handler: ResponseHandler(promise))
+                return promise.futureResult
+            } else {
+                return impl.makeFailedFuture(ConsulError.error("Can not build Consul API request string"))
+            }
+        }
+
+        /// List existing sessions
+        /// - Parameters
+        ///    - datacenter: Specifies the datacenter to query. This will default to the datacenter of the agent being queried.
+        /// - Returns: EventLoopFuture<[Session]> to deliver result
+        /// [apidoc]: https://developer.hashicorp.com/consul/api-docs/session#list-sessions
+        ///
+        public func list(inDatacenter datacenter: String? = nil) -> EventLoopFuture<[Session]> {
+            var components = URLComponents()
+            components.path = "/v1/session/list"
+
+            var queryItems = [URLQueryItem]()
+            if let datacenter, !datacenter.isEmpty {
+                queryItems.append(URLQueryItem(name: "dc", value: datacenter))
+            }
+
+            if !queryItems.isEmpty {
+                components.queryItems = queryItems
+            }
+
+            if let requestURI = components.string {
+                let promise = impl.makePromise(of: [Session].self)
+                impl.request(method: .PUT, uri: requestURI, body: nil, handler: ResponseHandler(promise))
+                return promise.futureResult
+            } else {
+                return impl.makeFailedFuture(ConsulError.error("Can not build Consul API request string"))
+            }
         }
     }
 
@@ -430,9 +617,10 @@ public final class Consul: Sendable {
     public var serverHost: String { impl.serverHost }
     public var serverPort: Int { impl.serverPort }
 
-    public let agent: Agent
-    public let catalog: Catalog
-    public let kv: KV
+    public let agent: AgentEndpoint
+    public let catalog: CatalogEndpoint
+    public let kv: KeyValueEndpoint
+    public let session: SessionEndpoint
 
     public var logLevel: Logger.Level {
         get { impl.logger.logLevel }
@@ -474,6 +662,10 @@ public final class Consul: Sendable {
 
         func makePromise<T>(of type: T.Type = T.self, file: StaticString = #fileID, line: UInt = #line) -> EventLoopPromise<T> {
             return eventLoopGroup.next().makePromise(of: type, file: file, line: line)
+        }
+
+        func makeFailedFuture<T>(_ error: Error) -> EventLoopFuture<T> {
+            return eventLoopGroup.next().makeFailedFuture(error)
         }
     }
 
@@ -532,9 +724,10 @@ public final class Consul: Sendable {
         // with only one event loop.
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         impl = Impl(host, port, eventLoopGroup)
-        agent = Agent(impl)
-        catalog = Catalog(impl)
-        kv = KV(impl)
+        agent = AgentEndpoint(impl)
+        catalog = CatalogEndpoint(impl)
+        kv = KeyValueEndpoint(impl)
+        session = SessionEndpoint(impl)
     }
 
     public func syncShutdown() throws {
@@ -572,6 +765,9 @@ private class HTTPHandler: ChannelInboundHandler {
 
         var headers = HTTPHeaders()
         headers.add(name: "Host", value: "\(serverHost):\(serverPort)")
+        if let requestBody {
+            headers.add(name: "Content-Length", value: "\(requestBody.readableBytes)")
+        }
 
         let requestHead = HTTPRequestHead(version: .http1_1,
                                           method: requestMethod,
@@ -607,13 +803,10 @@ private class HTTPHandler: ChannelInboundHandler {
             }
 
             if requestMethod == .PUT {
-                // body not expected
-                if responseHead.status == .ok {
-                    handler.processResponse(ByteBuffer(), withIndex: consulIndex)
-                } else {
+                if responseHead.status != .ok {
                     handler.fail(ConsulError.httpResponseError(responseHead.status))
+                    responseBody = nil
                 }
-                responseBody = nil
             }
         case var .body(buffer):
             logger.trace("\(logPrefix(context: context)): channelRead: body \(buffer.readableBytes) bytes")
