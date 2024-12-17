@@ -1,4 +1,3 @@
-import ExtrasJSON
 import Foundation
 import Logging
 import NIOCore
@@ -64,7 +63,7 @@ public final class Consul: Sendable {
             impl.logger.debug("register service \(service.id)")
             let promise = impl.makePromise(of: Void.self)
             do {
-                let data = try XJSONEncoder().encode(service)
+                let data = try JSONEncoder().encode(service)
                 var requestBody = ByteBufferAllocator().buffer(capacity: data.count)
                 requestBody.writeBytes(data)
                 impl.request(method: .PUT, uri: "/v1/agent/service/register", body: requestBody, handler: ResponseHandlerVoid(promise))
@@ -93,7 +92,7 @@ public final class Consul: Sendable {
         public func registerCheck(_ check: Check) -> EventLoopFuture<Void> {
             impl.logger.debug("register check \(check.name)")
             do {
-                let data = try XJSONEncoder().encode(check)
+                let data = try JSONEncoder().encode(check)
                 var requestBody = ByteBufferAllocator().buffer(capacity: data.count)
                 requestBody.writeBytes(data)
                 let promise = impl.makePromise(of: Void.self)
@@ -160,7 +159,7 @@ public final class Consul: Sendable {
                         var buffer = buffer
                         let bytes = buffer.readBytes(length: buffer.readableBytes)
                         if let bytes {
-                            let dict = try XJSONDecoder().decode([String: [String]].self, from: bytes)
+                            let dict = try JSONDecoder().decode([String: [String]].self, from: Data(bytes))
                             promise.succeed(Array(dict.keys))
                         } else {
                             promise.fail(ConsulError.error("ByteBuffer.readBytes() unexpectedly returned nil"))
@@ -219,7 +218,7 @@ public final class Consul: Sendable {
                     }
 
                     do {
-                        let services = try XJSONDecoder().decode([NodeService].self, from: bytes)
+                        let services = try JSONDecoder().decode([NodeService].self, from: Data(bytes))
                         promise.succeed((withIndex, services))
                     } catch {
                         guard let str = buffer.getString(at: buffer.readerIndex, length: buffer.readableBytes) else {
@@ -381,7 +380,7 @@ public final class Consul: Sendable {
                     }
 
                     do {
-                        let values = try XJSONDecoder().decode([Value].self, from: bytes)
+                        let values = try JSONDecoder().decode([Value].self, from: Data(bytes))
                         if values.count > 0 {
                             let value = values[0]
                             if let valueValue = value.value {
@@ -519,7 +518,7 @@ public final class Consul: Sendable {
                     }
 
                     do {
-                        let response = try XJSONDecoder().decode(CreateResponse.self, from: bytes)
+                        let response = try JSONDecoder().decode(CreateResponse.self, from: Data(bytes))
                         promise.succeed(response.id)
                     } catch {
                         guard let str = buffer.getString(at: buffer.readerIndex, length: buffer.readableBytes) else {
@@ -547,7 +546,7 @@ public final class Consul: Sendable {
             }
 
             do {
-                let bytes = try XJSONEncoder().encode(session)
+                let bytes = try JSONEncoder().encode(session)
                 var requestBody = ByteBufferAllocator().buffer(capacity: bytes.count)
                 requestBody.writeBytes(bytes)
                 if let requestURI = components.string {
@@ -740,7 +739,7 @@ public final class Consul: Sendable {
             }
 
             do {
-                let value = try XJSONDecoder().decode(T.self, from: bytes)
+                let value = try JSONDecoder().decode(T.self, from: Data(bytes))
                 promise.succeed(value)
             } catch {
                 guard let str = buffer.getString(at: buffer.readerIndex, length: buffer.readableBytes) else {
