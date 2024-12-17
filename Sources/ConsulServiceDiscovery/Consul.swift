@@ -157,12 +157,9 @@ public final class Consul: Sendable {
                 func processResponse(_ buffer: ByteBuffer, withIndex _: Int?) {
                     do {
                         var buffer = buffer
-                        let bytes = buffer.readBytes(length: buffer.readableBytes)
-                        if let bytes {
+                        try buffer.withUnsafeReadableBytes { bytes -> Void in
                             let dict = try JSONDecoder().decode([String: [String]].self, from: Data(bytes))
                             promise.succeed(Array(dict.keys))
-                        } else {
-                            promise.fail(ConsulError.error("ByteBuffer.readBytes() unexpectedly returned nil"))
                         }
                     } catch {
                         promise.fail(error)
