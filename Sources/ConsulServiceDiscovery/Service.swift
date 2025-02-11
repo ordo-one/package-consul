@@ -1,6 +1,5 @@
-import Foundation
 
-public struct Service: Codable {
+public struct Service: Codable, Sendable {
     /// Specifies the address of the service.
     let address: String?
     /// The list of Consul checks for the service. Cannot be specified with
@@ -38,7 +37,7 @@ public struct Service: Codable {
     }
 }
 
-public struct Check: Codable {
+public struct Check: Codable, Sendable {
     /// Specifies a body that should be sent with HTTP checks.
     let body: String?
     /// The unique ID for this check on the node. Defaults to the check `name`.
