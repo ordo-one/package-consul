@@ -370,8 +370,8 @@ public final class Consul: Sendable {
                     }
 
                     do {
-                        let values = try buffer.withUnsafeReadableBytes { bytes -> [Value] in
-                            return try JSONDecoder().decode([Value].self, from: Data(bytes))
+                        let values = try buffer.withUnsafeReadableBytes {
+                            try JSONDecoder().decode([Value].self, from: Data($0))
                         }
                         if values.count > 0 {
                             let value = values[0]
@@ -653,22 +653,19 @@ public final class Consul: Sendable {
     public let kv: KeyValueEndpoint
     public let session: SessionEndpoint
 
-    public var logLevel: Logger.Level {
-        get { impl.logger.logLevel }
-        set { impl.logger.logLevel = newValue }
-    }
-
     final class Impl: Sendable {
         let serverHost: String
         let serverPort: Int
         let eventLoopGroup: EventLoopGroup
-        var logger: Logger
+        let logger: Logger
 
-        init(_ serverHost: String, _ serverPort: Int, _ eventLoopGroup: EventLoopGroup) {
+        init(_ serverHost: String, _ serverPort: Int, _ logLevel: Logger.Level, _ eventLoopGroup: EventLoopGroup) {
             self.serverHost = serverHost
             self.serverPort = serverPort
             self.eventLoopGroup = eventLoopGroup
-            self.logger = Logger(label: "consul")
+            var logger = Logger(label: "consul")
+            logger.logLevel = logLevel
+            self.logger = logger
         }
 
         func request(method requestMethod: HTTPMethod, uri requestURI: String, body requestBody: ByteBuffer?, handler: some ConsulResponseHandler) {
@@ -742,7 +739,7 @@ public final class Consul: Sendable {
         }
     }
 
-    public init(host: String = defaultHost, port: Int = defaultPort) {
+    public init(host: String = defaultHost, port: Int = defaultPort, logLevel: Logger.Level = .info) {
         // We use EventLoopFuture<> as a result for most calls,
         // the problem here is the 'future' is tied to particular event loop,
         // and from SwiftNIO point of view it is an error if we fill the 'future'
@@ -752,7 +749,7 @@ public final class Consul: Sendable {
         // The only way to workaround that issue now is to use an event loop group
         // with only one event loop.
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        impl = Impl(host, port, eventLoopGroup)
+        impl = Impl(host, port, logLevel, eventLoopGroup)
         agent = AgentEndpoint(impl)
         catalog = CatalogEndpoint(impl)
         kv = KeyValueEndpoint(impl)
@@ -764,7 +761,7 @@ public final class Consul: Sendable {
     }
 }
 
-private class HTTPHandler: ChannelInboundHandler {
+private final class HTTPHandler: @unchecked Sendable, ChannelInboundHandler {
     typealias InboundIn = HTTPClientResponsePart
     typealias OutboundOut = HTTPClientRequestPart
 
@@ -778,7 +775,15 @@ private class HTTPHandler: ChannelInboundHandler {
     private var consulIndex: Int?
     private let logger: Logger
 
-    init(_ serverHost: String, _ serverPort: Int, requestMethod: HTTPMethod, requestURI: String, requestBody: ByteBuffer?, handler: any ConsulResponseHandler, _ logger: Logger) {
+    init(
+        _ serverHost: String,
+        _ serverPort: Int,
+        requestMethod: HTTPMethod,
+        requestURI: String,
+        requestBody: ByteBuffer?,
+        handler: any ConsulResponseHandler,
+        _ logger: Logger
+    ) {
         self.serverHost = serverHost
         self.serverPort = serverPort
         self.requestMethod = requestMethod
