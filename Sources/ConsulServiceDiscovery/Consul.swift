@@ -6,6 +6,7 @@ import NIOPosix
 
 public enum ConsulError: Error {
     case failedToConnect(String)
+    case httpResponseError(HTTPResponseStatus, String)
     case httpResponseError(HTTPResponseStatus)
     case failedToDecodeValue(String)
     case error(String)
@@ -771,6 +772,7 @@ private final class HTTPHandler: @unchecked Sendable, ChannelInboundHandler {
     private let requestURI: String
     private let requestBody: ByteBuffer?
     private let handler: any ConsulResponseHandler
+    private var responseStatus: HTTPResponseStatus?
     private var responseBody: ByteBuffer?
     private var consulIndex: Int?
     private let logger: Logger
@@ -836,20 +838,30 @@ private final class HTTPHandler: @unchecked Sendable, ChannelInboundHandler {
                 self.consulIndex = Int(consulIndex)
             }
 
-            if requestMethod == .PUT {
-                if responseHead.status != .ok {
-                    handler.fail(ConsulError.httpResponseError(responseHead.status))
-                    responseBody = nil
-                }
-            }
+            self.responseStatus = responseHead.status
         case var .body(buffer):
             logger.trace("\(logPrefix(context: context)): channelRead: body \(buffer.readableBytes) bytes")
             responseBody?.writeBuffer(&buffer)
         case .end:
             logger.trace("\(logPrefix(context: context)): channelRead: end, close channel")
-            if let responseBody {
-                handler.processResponse(responseBody, withIndex: consulIndex)
-                self.responseBody = nil
+            if let responseStatus {
+                if responseStatus == .ok {
+                    if let responseBody {
+                        handler.processResponse(responseBody, withIndex: consulIndex)
+                        self.responseBody = nil
+                    } else {
+                        handler.fail(ConsulError.error("HTTP end without body"))
+                    }
+                } else {
+                    if let responseBody, let str = responseBody.getString(at: 0, length: responseBody.readableBytes) {
+                        handler.fail(ConsulError.httpResponseError(responseStatus, str))
+                        self.responseBody = nil
+                    } else {
+                        handler.fail(ConsulError.httpResponseError(responseStatus))
+                    }
+                }
+            } else {
+                handler.fail(ConsulError.error("HTTP end without head"))
             }
             context.close(promise: nil)
         }
