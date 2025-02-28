@@ -6,8 +6,7 @@ import NIOPosix
 
 public enum ConsulError: Error {
     case failedToConnect(String)
-    case httpResponseError(HTTPResponseStatus, String)
-    case httpResponseError(HTTPResponseStatus)
+    case httpResponseError(HTTPResponseStatus, String?)
     case failedToDecodeValue(String)
     case error(String)
 }
@@ -857,7 +856,7 @@ private final class HTTPHandler: @unchecked Sendable, ChannelInboundHandler {
                         handler.fail(ConsulError.httpResponseError(responseStatus, str))
                         self.responseBody = nil
                     } else {
-                        handler.fail(ConsulError.httpResponseError(responseStatus))
+                        handler.fail(ConsulError.httpResponseError(responseStatus, nil))
                     }
                 }
             } else {
