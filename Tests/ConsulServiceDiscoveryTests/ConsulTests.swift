@@ -58,7 +58,7 @@ final class ConsulTests: XCTestCase {
                 XCTFail("check update unexpectedly succeeded")
             case let .failure(error):
                 if let error = error as? ConsulError,
-                   case let .httpResponseError(responseStatus) = error,
+                   case let .httpResponseError(responseStatus, _) = error,
                    responseStatus == .notFound {
                     // expected error
                 } else {
@@ -101,7 +101,7 @@ final class ConsulTests: XCTestCase {
         XCTAssertEqual(valueValue, testValue)
 
         let future4 = consul.kv.removeValue(forKey: testKey)
-        try future4.wait()
+        _ = try future4.wait()
 
         let future5 = consul.kv.keys()
         let keys5 = try future5.wait()
@@ -112,12 +112,17 @@ final class ConsulTests: XCTestCase {
 
     func testKVDoesNotExist() throws {
         let consul = Consul()
-
         let testKey = "test-key-does-not-exist"
         let future1 = consul.kv.valueForKey(testKey)
-        let value = try future1.wait()
-        XCTAssertEqual(value, nil)
-
+        XCTAssertThrowsError(try future1.wait()) {
+            if let error = $0 as? ConsulError,
+               case let .httpResponseError(responseStatus, _) = error,
+               responseStatus == .notFound {
+                // expected error
+            } else {
+                XCTFail("unexpected error \($0)")
+            }
+        }
         try consul.syncShutdown()
     }
 
