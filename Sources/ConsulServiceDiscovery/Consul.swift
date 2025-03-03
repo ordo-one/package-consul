@@ -845,16 +845,15 @@ private final class HTTPHandler: @unchecked Sendable, ChannelInboundHandler {
             logger.trace("\(logPrefix(context: context)): channelRead: end, close channel")
             if let responseStatus {
                 if responseStatus == .ok {
-                    if let responseBody {
+                    if let responseBody = self.responseBody.take() {
                         handler.processResponse(responseBody, withIndex: consulIndex)
-                        self.responseBody = nil
                     } else {
                         handler.fail(ConsulError.error("HTTP end without body"))
                     }
                 } else {
-                    if let responseBody, let str = responseBody.getString(at: 0, length: responseBody.readableBytes) {
+                    if let responseBody = self.responseBody.take(),
+                       let str = responseBody.getString(at: 0, length: responseBody.readableBytes) {
                         handler.fail(ConsulError.httpResponseError(responseStatus, str))
-                        self.responseBody = nil
                     } else {
                         handler.fail(ConsulError.httpResponseError(responseStatus, nil))
                     }
