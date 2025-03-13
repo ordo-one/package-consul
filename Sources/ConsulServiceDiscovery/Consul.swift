@@ -60,7 +60,7 @@ public final class Consul: Sendable {
         /// [apidoc]: https://www.consul.io/api/agent/service.html#register-service
         ///
         public func registerService(_ service: Service) -> EventLoopFuture<Void> {
-            impl.logger.debug("register service \(service.id)")
+            impl.logger.debug("register service '\(service.name)'/'\(service.id)'")
             let promise = impl.makePromise(of: Void.self)
             do {
                 let data = try JSONEncoder().encode(service)
@@ -79,6 +79,7 @@ public final class Consul: Sendable {
         /// [apidoc]: https://developer.hashicorp.com/consul/api-docs/agent/service#deregister-service
         ///
         public func deregisterServiceID(_ serviceID: String) -> EventLoopFuture<Void> {
+            impl.logger.debug("deregister service '\(serviceID)'")
             let promise = impl.makePromise(of: Void.self)
             impl.request(method: .PUT, uri: "/v1/agent/service/deregister/\(serviceID)", body: nil, handler: ResponseHandlerVoid(promise))
             return promise.futureResult
@@ -90,7 +91,7 @@ public final class Consul: Sendable {
         /// [apidoc] https://developer.hashicorp.com/consul/api-docs/agent/check#register-check
         ///
         public func registerCheck(_ check: Check) -> EventLoopFuture<Void> {
-            impl.logger.debug("register check \(check.name)")
+            impl.logger.debug("register check '\(check.name)'")
             do {
                 let data = try JSONEncoder().encode(check)
                 var requestBody = ByteBufferAllocator().buffer(capacity: data.count)
@@ -109,7 +110,7 @@ public final class Consul: Sendable {
         /// [apidoc] https://developer.hashicorp.com/consul/api-docs/agent/check#deregister-check
         ///
         public func deregisterCheck(_ checkId: String) -> EventLoopFuture<Void> {
-            impl.logger.debug("deregister check \(checkId)")
+            impl.logger.debug("deregister check '\(checkId)'")
             let promise = impl.makePromise(of: Void.self)
             let uri = "/v1/agent/check/deregister/\(checkId)"
             impl.request(method: .PUT, uri: uri, body: nil, handler: ResponseHandlerVoid(promise))
