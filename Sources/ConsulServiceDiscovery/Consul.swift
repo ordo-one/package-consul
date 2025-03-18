@@ -405,7 +405,13 @@ public final class Consul: Sendable {
                 }
 
                 func fail(_ error: Error) {
-                    promise.fail(error)
+                    if let error = error as? ConsulError,
+                       case let .httpResponseError(responseStatus, _) = error,
+                       responseStatus == .notFound {
+                        promise.succeed(nil)
+                    } else {
+                        promise.fail(error)
+                    }
                 }
             }
 

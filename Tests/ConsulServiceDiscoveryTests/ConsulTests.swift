@@ -113,16 +113,9 @@ final class ConsulTests: XCTestCase {
     func testKVDoesNotExist() throws {
         let consul = Consul()
         let testKey = "test-key-does-not-exist"
-        let future1 = consul.kv.valueForKey(testKey)
-        XCTAssertThrowsError(try future1.wait()) {
-            if let error = $0 as? ConsulError,
-               case let .httpResponseError(responseStatus, _) = error,
-               responseStatus == .notFound {
-                // expected error
-            } else {
-                XCTFail("unexpected error \($0)")
-            }
-        }
+        let future = consul.kv.valueForKey(testKey)
+        let value = try future.wait()
+        XCTAssertEqual(value, nil)
         try consul.syncShutdown()
     }
 
