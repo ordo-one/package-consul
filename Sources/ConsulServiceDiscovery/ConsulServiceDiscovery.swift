@@ -1,6 +1,5 @@
 import Dispatch
-#warning("Remove preconcurrency after migration to ServiceDiscovery 2.0")
-@preconcurrency import ServiceDiscovery
+import ServiceDiscovery
 
 public final class ConsulServiceDiscovery: ServiceDiscovery, Sendable {
     public typealias Service = String
@@ -25,11 +24,13 @@ public final class ConsulServiceDiscovery: ServiceDiscovery, Sendable {
         }
     }
 
-    private func subscribe(to service: Service,
-                           onNext nextResultHandler: @escaping @Sendable (Result<[Instance], Error>) -> Void,
-                           onCompletion completionHandler: @escaping @Sendable (CompletionReason) -> Void,
-                           cancellationToken: CancellationToken,
-                           polling poll: Consul.Poll?) {
+    private func subscribe(
+        to service: Service,
+        onNext nextResultHandler: @escaping @Sendable (Result<[Instance], Error>) -> Void,
+        onCompletion completionHandler: @escaping @Sendable (CompletionReason) -> Void,
+        cancellationToken: CancellationToken,
+        polling poll: Consul.Poll?
+    ) {
         consul.catalog.nodes(withService: service, poll: poll).whenComplete { result in
             if cancellationToken.isCancelled {
                 completionHandler(.cancellationRequested)
@@ -58,9 +59,11 @@ public final class ConsulServiceDiscovery: ServiceDiscovery, Sendable {
         }
     }
 
-    public func subscribe(to service: Service,
-                          onNext nextResultHandler: @escaping @Sendable (Result<[Instance], Error>) -> Void,
-                          onComplete completionHandler: @escaping @Sendable (CompletionReason) -> Void) -> CancellationToken {
+    public func subscribe(
+        to service: Service,
+        onNext nextResultHandler: @escaping @Sendable (Result<[Instance], Error>) -> Void,
+        onComplete completionHandler: @escaping @Sendable (CompletionReason) -> Void
+    ) -> CancellationToken {
         let cancellationToken = CancellationToken(isCancelled: false, completionHandler: completionHandler)
         subscribe(to: service,
                   onNext: nextResultHandler,
