@@ -1,6 +1,5 @@
 import Dispatch
-#warning("Remove preconcurrency after migration to ServiceDiscovery 2.0")
-@preconcurrency import ServiceDiscovery
+import ServiceDiscovery
 
 public final class ConsulServiceDiscovery: ServiceDiscovery, Sendable {
     public typealias Service = String
