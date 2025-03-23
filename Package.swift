@@ -17,7 +17,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-nio.git", .upToNextMajor(from: "2.49.0")),
-        .package(url: "https://github.com/apple/swift-service-discovery.git", .upToNextMajor(from: "1.2.0")),
+        .package(url: "https://github.com/apple/swift-service-discovery.git", .upToNextMajor(from: "1.4.0")),
         .package(url: "https://github.com/apple/swift-log", .upToNextMajor(from: "1.0.0"))
     ],
     targets: [
