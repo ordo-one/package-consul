@@ -648,6 +648,11 @@ public final class Consul: Sendable {
     public struct Poll {
         public let index: Int
         public let wait: String?
+
+        public init(index: Int, wait: String? = nil) {
+            self.index = index
+            self.wait = wait
+        }
     }
 
     let impl: Impl
