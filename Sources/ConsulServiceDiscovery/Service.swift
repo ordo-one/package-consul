@@ -1,22 +1,30 @@
 
 public struct Service: Codable, Sendable {
     /// Specifies the address of the service.
-    let address: String?
+    public let address: String?
     /// The list of Consul checks for the service. Cannot be specified with
     /// `healthSyncContainers`.
-    let checks: [Check]?
+    public let checks: [Check]?
     /// Specifies a unique ID for this service.
-    let id: String
+    public let id: String
     /// Key-value pairs of metadata to include for the Consul service.
-    let meta: [String: String]?
+    public let meta: [String: String]?
     /// The name the service will be registered as in Consul.
-    let name: String
+    public let name: String
     /// Port the application listens on, if any.
-    let port: Int?
+    public let port: Int?
     /// List of string values that can be used to add service-level labels.
-    let tags: [String]?
+    public let tags: [String]?
 
-    public init(address: String? = nil, checks: [Check]? = nil, id: String, meta: [String: String]? = nil, name: String, port: Int? = nil, tags: [String]? = nil) {
+    public init(
+        address: String? = nil,
+        checks: [Check]? = nil,
+        id: String,
+        meta: [String: String]? = nil,
+        name: String,
+        port: Int? = nil,
+        tags: [String]? = nil
+    ) {
         self.address = address
         self.checks = checks
         self.id = id
@@ -39,32 +47,45 @@ public struct Service: Codable, Sendable {
 
 public struct Check: Codable, Sendable {
     /// Specifies a body that should be sent with HTTP checks.
-    let body: String?
+    public let body: String?
     /// The unique ID for this check on the node. Defaults to the check `name`.
-    let checkID: String?
+    public let checkID: String?
     /// Specifies that checks associated with a service should deregister after this time.
-    let deregisterCriticalServiceAfter: String?
+    public let deregisterCriticalServiceAfter: String?
     /// Specifies an HTTP check to perform a GET request against the value of HTTP (expected to be a URL) every Interval.
-    let http: String?
+    public let http: String?
     /// Specifies the frequency at which to run this check. This is required for HTTP, TCP, and UDP checks.
-    let interval: String?
+    public let interval: String?
     /// Specifies a different HTTP method to be used for an HTTP check. When no value is specified, GET is used.
-    let method: String?
+    public let method: String?
     /// The name of the check.
-    let name: String
+    public let name: String
     /// Specifies the initial status the health check.
-    let status: Status?
+    public let status: Status?
     /// Specifies a TCP to connect against the value of TCP (expected to be an IP or hostname plus port combination) every Interval.
-    let tcp: String?
+    public let tcp: String?
     /// Specifies a timeout for outgoing connections. Applies to script, HTTP, TCP, UDP, and gRPC
     /// checks. Must be a duration string, such as `10s` or `5m`.
-    let timeout: String?
+    public let timeout: String?
     /// Specifies this is a TTL check. Must be a duration string, such as `10s` or `5m`.
-    let ttl: String?
+    public let ttl: String?
     /// Specifies a UDP IP address/hostname and port. The check sends datagrams to the value specified at the interval specified in the Interval configuration.
-    let udp: String?
+    public let udp: String?
 
-    public init(body: String? = nil, checkID: String? = nil, deregisterCriticalServiceAfter: String? = nil, http: String? = nil, interval: String? = nil, method: String? = nil, name: String, status: Status? = nil, tcp: String? = nil, timeout: String? = nil, ttl: String? = nil, udp: String? = nil) {
+    public init(
+        body: String? = nil,
+        checkID: String? = nil,
+        deregisterCriticalServiceAfter: String? = nil,
+        http: String? = nil,
+        interval: String? = nil,
+        method: String? = nil,
+        name: String,
+        status: Status? = nil,
+        tcp: String? = nil,
+        timeout: String? = nil,
+        ttl: String? = nil,
+        udp: String? = nil
+    ) {
         self.body = body
         self.checkID = checkID
         self.deregisterCriticalServiceAfter = deregisterCriticalServiceAfter
@@ -115,7 +136,20 @@ public struct NodeService: Hashable, Decodable, Sendable {
     public let servicePort: Int?
     public let taggedAddresses: [String: String]?
 
-    public init(address: String? = nil, createIndex: Int? = nil, datacenter: String? = nil, id: String? = nil, modifyIndex: Int? = nil, node: String? = nil, serviceAddress: String? = nil, serviceID: String, serviceMeta: [String: String]? = nil, serviceName: String? = nil, servicePort: Int? = nil, taggedAddresses: [String: String]? = nil) {
+    public init(
+        address: String? = nil,
+        createIndex: Int? = nil,
+        datacenter: String? = nil,
+        id: String? = nil,
+        modifyIndex: Int? = nil,
+        node: String? = nil,
+        serviceAddress: String? = nil,
+        serviceID: String,
+        serviceMeta: [String: String]? = nil,
+        serviceName: String? = nil,
+        servicePort: Int? = nil,
+        taggedAddresses: [String: String]? = nil
+    ) {
         self.address = address
         self.createIndex = createIndex
         self.datacenter = datacenter
@@ -220,7 +254,14 @@ public struct Session: Codable, Sendable {
     public let createIndex: Int?
     public let modifyIndex: Int?
 
-    public init(behavior: String? = nil, lockDelay: Int? = nil, name: String? = nil, nodeChecks: [String]? = nil, serviceChecks: [ServiceCheck]? = nil, ttl: String? = nil) {
+    public init(
+        behavior: String? = nil,
+        lockDelay: Int? = nil,
+        name: String? = nil,
+        nodeChecks: [String]? = nil,
+        serviceChecks: [ServiceCheck]? = nil,
+        ttl: String? = nil
+    ) {
         self.behavior = behavior
         self.id = nil
         self.lockDelay = lockDelay.map { .init($0) }
