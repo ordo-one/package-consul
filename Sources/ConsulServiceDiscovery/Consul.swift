@@ -937,7 +937,7 @@ extension ChannelError {
         case let .illegalMulticastAddress(address):
             "Illegal multicast address \(address)"
         case let .multicastNotSupported(interface):
-            "Multipcast not supported on interface \(interface)"
+            "Multicast not supported on interface \(interface)"
         case .inappropriateOperationForState:
             "Inappropriate operation for state"
         case .unremovableHandler:
