@@ -695,15 +695,10 @@ public final class Consul: Sendable {
                 }
                 .connect(host: serverHost, port: serverPort)
                 .whenFailure { error in
-                    let localizedDescription: String
-
-                    switch error {
-                    case let channelError as ChannelError:
-                        localizedDescription = channelError.errorMessage
-                    case let connectionError as NIOConnectionError:
-                        localizedDescription = connectionError.errorMessage
-                    default:
-                        localizedDescription = error.localizedDescription
+                    let localizedDescription = switch error {
+                    case let channelError as ChannelError: channelError.errorMessage
+                    case let connectionError as NIOConnectionError: connectionError.errorMessage
+                    default: error.localizedDescription
                     }
 
                     let message = "Failed to connect to consul API @ \(self.serverHost):\(self.serverPort): \(localizedDescription)"
