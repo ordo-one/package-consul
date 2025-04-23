@@ -699,9 +699,9 @@ public final class Consul: Sendable {
 
                     switch error {
                     case let channelError as ChannelError:
-                        localizedDescription = channelError.localizedDescription
+                        localizedDescription = channelError.errorMessage
                     case let connectionError as NIOConnectionError:
-                        localizedDescription = connectionError.localizedDescription
+                        localizedDescription = connectionError.errorMessage
                     default:
                         localizedDescription = error.localizedDescription
                     }
@@ -906,7 +906,7 @@ private final class HTTPHandler: @unchecked Sendable, ChannelInboundHandler {
 }
 
 extension ChannelError {
-    var localizedDescription: String {
+    var errorMessage: String {
         switch self {
         case .connectPending:
             "Connect pending"
@@ -947,7 +947,7 @@ extension ChannelError {
 }
 
 extension NIOConnectionError {
-    var localizedDescription: String {
+    var errorMessage: String {
         if let dnsError = (dnsAError ?? dnsAAAAError) {
             return "DNS error: \(dnsError.localizedDescription)"
         }
@@ -955,7 +955,7 @@ extension NIOConnectionError {
         if !connectionErrors.isEmpty {
             let descriptions = connectionErrors.map {
                 if let channelError = $0.error as? ChannelError {
-                    channelError.localizedDescription
+                    channelError.errorMessage
                 } else {
                     $0.error.localizedDescription
                 }
