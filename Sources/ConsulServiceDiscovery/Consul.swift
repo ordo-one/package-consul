@@ -695,18 +695,18 @@ public final class Consul: Sendable {
                 }
                 .connect(host: serverHost, port: serverPort)
                 .whenFailure { error in
-                    let errorMessage: String
+                    let localizedDescription: String
 
                     switch error {
                     case let channelError as ChannelError:
-                        errorMessage = channelError.errorMessage
+                        localizedDescription = channelError.localizedDescription
                     case let connectionError as NIOConnectionError:
-                        errorMessage = connectionError.connectionErrors.map { $0.error.localizedDescription }.joined(separator: ", ")
+                        localizedDescription = connectionError.localizedDescription
                     default:
-                        errorMessage = error.localizedDescription
+                        localizedDescription = error.localizedDescription
                     }
 
-                    let message = "Failed to connect to consul API @ \(self.serverHost):\(self.serverPort): \(errorMessage)"
+                    let message = "Failed to connect to consul API @ \(self.serverHost):\(self.serverPort): \(localizedDescription)"
                     handler.fail(ConsulError.failedToConnect(message))
                 }
         }
@@ -906,7 +906,7 @@ private final class HTTPHandler: @unchecked Sendable, ChannelInboundHandler {
 }
 
 extension ChannelError {
-    var errorMessage: String {
+    var localizedDescription: String {
         switch self {
         case .connectPending:
             "Connect pending"
@@ -943,5 +943,27 @@ extension ChannelError {
         case .unremovableHandler:
             "Unremovable handler"
         }
+    }
+}
+
+extension NIOConnectionError {
+    var localizedDescription: String {
+        if let dnsError = (dnsAError ?? dnsAAAAError) {
+            return "DNS error: \(dnsError.localizedDescription)"
+        }
+
+        if !connectionErrors.isEmpty {
+            let descriptions = connectionErrors.map {
+                if let channelError = $0.error as? ChannelError {
+                    channelError.localizedDescription
+                } else {
+                    $0.error.localizedDescription
+                }
+            }
+
+            return "Connection errors: \(descriptions.joined(separator: ", "))"
+        }
+
+        return "Unknown error"
     }
 }
