@@ -695,7 +695,18 @@ public final class Consul: Sendable {
                 }
                 .connect(host: serverHost, port: serverPort)
                 .whenFailure { error in
-                    let message = "Failed to connect to consul API @ \(self.serverHost):\(self.serverPort): \(error.localizedDescription)"
+                    let errorMessage: String
+
+                    switch error {
+                    case let channelError as ChannelError:
+                        errorMessage = channelError.errorMessage
+                    case let connectionError as NIOConnectionError:
+                        errorMessage = connectionError.connectionErrors.map { $0.error.localizedDescription }.joined(separator: ", ")
+                    default:
+                        errorMessage = error.localizedDescription
+                    }
+
+                    let message = "Failed to connect to consul API @ \(self.serverHost):\(self.serverPort): \(errorMessage)"
                     handler.fail(ConsulError.failedToConnect(message))
                 }
         }
@@ -891,5 +902,46 @@ private final class HTTPHandler: @unchecked Sendable, ChannelInboundHandler {
             responseBody = nil
         }
         context.close(promise: nil)
+    }
+}
+
+extension ChannelError {
+    var errorMessage: String {
+        switch self {
+        case .connectPending:
+            "Connect pending"
+        case let .connectTimeout(value):
+            "Connect timeout (\(value))"
+        case .operationUnsupported:
+            "Operation unsupported"
+        case .ioOnClosedChannel:
+            "I/O on closed channel"
+        case .alreadyClosed:
+            "Already closed"
+        case .outputClosed:
+            "Output closed"
+        case .inputClosed:
+            "Input closed"
+        case .eof:
+            "End of file"
+        case .writeMessageTooLarge:
+            "Write message too large"
+        case .writeHostUnreachable:
+            "Write host unreachable"
+        case .unknownLocalAddress:
+            "Unknown local address"
+        case .badMulticastGroupAddressFamily:
+            "Bad multicast group address family"
+        case .badInterfaceAddressFamily:
+            "Bad interface address family"
+        case let .illegalMulticastAddress(address):
+            "Illegal multicast address \(address)"
+        case let .multicastNotSupported(interface):
+            "Multipcast not supported on interface \(interface)"
+        case .inappropriateOperationForState:
+            "Inappropriate operation for state"
+        case .unremovableHandler:
+            "Unremovable handler"
+        }
     }
 }
