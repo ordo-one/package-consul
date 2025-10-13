@@ -22,11 +22,13 @@ public final class Consul: Sendable {
     public static var defaultHost: String {
         let defaultHost = "127.0.0.1"
 
-        guard let consulHTTPAdress = ProcessInfo.processInfo.environment["CONSUL_HTTP_ADDR"] else {
+        guard let consulHTTPAddress = ProcessInfo.processInfo.environment["CONSUL_HTTP_ADDR"] else {
             return defaultHost
         }
 
-        guard let urlHost = URL(string: consulHTTPAdress)?.host else {
+        let urlString = consulHTTPAddress.contains("://") ? consulHTTPAddress : "http://\(consulHTTPAddress)"
+
+        guard let urlHost = URL(string: urlString)?.host else {
             return defaultHost
         }
 
