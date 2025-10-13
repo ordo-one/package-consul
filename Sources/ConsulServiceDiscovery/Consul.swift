@@ -19,32 +19,24 @@ protocol ConsulResponseHandler: Sendable {
 public final class Consul: Sendable {
     static let reconnectInterval: TimeAmount = .seconds(5)
 
+    private static var urlFromEnv: URL? {
+        guard let consulHTTPAddress = ProcessInfo.processInfo.environment["CONSUL_HTTP_ADDR"] else {
+            return nil
+        }
+
+        let urlString = consulHTTPAddress.contains("://") ? consulHTTPAddress : "http://\(consulHTTPAddress)"
+
+        return URL(string: urlString)
+    }
+
     public static var defaultHost: String {
         let defaultHost = "127.0.0.1"
-
-        guard let consulHTTPAdress = ProcessInfo.processInfo.environment["CONSUL_HTTP_ADDR"] else {
-            return defaultHost
-        }
-
-        guard let urlHost = URL(string: consulHTTPAdress)?.host else {
-            return defaultHost
-        }
-
-        return urlHost
+        return Self.urlFromEnv?.host ?? defaultHost
     }
 
     public static var defaultPort: Int {
         let defaultPort = 8_500
-
-        guard let consulHTTPAdress = ProcessInfo.processInfo.environment["CONSUL_HTTP_ADDR"] else {
-            return defaultPort
-        }
-
-        guard let urlPort = URL(string: consulHTTPAdress)?.port else {
-            return defaultPort
-        }
-
-        return urlPort
+        return Self.urlFromEnv?.port ?? defaultPort
     }
 
     public struct AgentEndpoint: Sendable {
