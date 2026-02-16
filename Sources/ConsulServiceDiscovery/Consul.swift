@@ -186,9 +186,11 @@ public final class Consul: Sendable {
         /// - Returns: EventLoopFuture<(Int, [NodeService])> to deliver result where first element of tuple is value of "X-Consul-Index" from HTTP header
         /// [apidoc]: https://developer.hashicorp.com/consul/api-docs/catalog#list-nodes-for-service
         ///
-        public func nodes(inDatacenter datacenter: String? = nil,
-                          withService serviceName: String,
-                          poll: Poll? = nil) -> EventLoopFuture<(Int, [NodeService])> {
+        public func nodes(
+            inDatacenter datacenter: String? = nil,
+            withService serviceName: String,
+            poll: Poll? = nil
+        ) -> EventLoopFuture<(Int, [NodeService])> {
             struct ResponseHandler: ConsulResponseHandler {
                 private let promise: EventLoopPromise<(Int, [NodeService])>
 
@@ -637,6 +639,88 @@ public final class Consul: Sendable {
         }
     }
 
+    public struct StatusEndpoint: Sendable {
+        private let impl: Impl
+
+        fileprivate init(_ impl: Impl) {
+            self.impl = impl
+        }
+
+        public func leader() -> EventLoopFuture<String> {
+            struct ResponseHandler: ConsulResponseHandler {
+                private let promise: EventLoopPromise<String>
+
+                init(_ promise: EventLoopPromise<String>) {
+                    self.promise = promise
+                }
+
+                func processResponse(_ buffer: ByteBuffer, withIndex _: Int?) {
+                    do {
+                        try buffer.withUnsafeReadableBytes { bytes in
+                            let leader = try JSONDecoder().decode(String.self, from: Data(bytes))
+                            promise.succeed(leader)
+                        }
+                    } catch {
+                        let str = buffer.hexDump(format: .detailed)
+                        promise.fail(ConsulError.error("Failed to decode response '\(str)': \(error)"))
+                    }
+                }
+
+                func fail(_ error: any Error) {
+                    promise.fail(error)
+                }
+            }
+
+            var components = URLComponents()
+            components.path = "/v1/status/leader"
+
+            if let requestURI = components.string {
+                let promise = impl.makePromise(of: String.self)
+                impl.request(method: .GET, uri: requestURI, body: nil, handler: ResponseHandler(promise))
+                return promise.futureResult
+            } else {
+                return impl.makeFailedFuture(ConsulError.error("Can not build Consul API request string"))
+            }
+        }
+
+        public func peers() -> EventLoopFuture<[String]> {
+            struct ResponseHandler: ConsulResponseHandler {
+                private let promise: EventLoopPromise<[String]>
+
+                init(_ promise: EventLoopPromise<[String]>) {
+                    self.promise = promise
+                }
+
+                func processResponse(_ buffer: ByteBuffer, withIndex _: Int?) {
+                    do {
+                        try buffer.withUnsafeReadableBytes { bytes in
+                            let peers = try JSONDecoder().decode([String].self, from: Data(bytes))
+                            promise.succeed(peers)
+                        }
+                    } catch {
+                        let str = buffer.hexDump(format: .detailed)
+                        promise.fail(ConsulError.error("Failed to decode response '\(str)': \(error)"))
+                    }
+                }
+
+                func fail(_ error: any Error) {
+                    promise.fail(error)
+                }
+            }
+
+            var components = URLComponents()
+            components.path = "/v1/status/peers"
+
+            if let requestURI = components.string {
+                let promise = impl.makePromise(of: [String].self)
+                impl.request(method: .GET, uri: requestURI, body: nil, handler: ResponseHandler(promise))
+                return promise.futureResult
+            } else {
+                return impl.makeFailedFuture(ConsulError.error("Can not build Consul API request string"))
+            }
+        }
+    }
+
     public struct Poll {
         public let index: Int
         public let wait: String?
@@ -656,6 +740,7 @@ public final class Consul: Sendable {
     public let catalog: CatalogEndpoint
     public let kv: KeyValueEndpoint
     public let session: SessionEndpoint
+    public let status: StatusEndpoint
 
     final class Impl: Sendable {
         let serverHost: String
@@ -758,6 +843,7 @@ public final class Consul: Sendable {
         catalog = CatalogEndpoint(impl)
         kv = KeyValueEndpoint(impl)
         session = SessionEndpoint(impl)
+        status = StatusEndpoint(impl)
     }
 
     public func syncShutdown() throws {
