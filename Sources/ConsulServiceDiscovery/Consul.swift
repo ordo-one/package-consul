@@ -647,36 +647,12 @@ public final class Consul: Sendable {
         }
 
         public func leader() -> EventLoopFuture<String> {
-            struct ResponseHandler: ConsulResponseHandler {
-                private let promise: EventLoopPromise<String>
-
-                init(_ promise: EventLoopPromise<String>) {
-                    self.promise = promise
-                }
-
-                func processResponse(_ buffer: ByteBuffer, withIndex _: Int?) {
-                    do {
-                        try buffer.withUnsafeReadableBytes { bytes in
-                            let leader = try JSONDecoder().decode(String.self, from: Data(bytes))
-                            promise.succeed(leader)
-                        }
-                    } catch {
-                        let str = buffer.hexDump(format: .detailed)
-                        promise.fail(ConsulError.error("Failed to decode response '\(str)': \(error)"))
-                    }
-                }
-
-                func fail(_ error: any Error) {
-                    promise.fail(error)
-                }
-            }
-
             var components = URLComponents()
             components.path = "/v1/status/leader"
-
             if let requestURI = components.string {
                 let promise = impl.makePromise(of: String.self)
-                impl.request(method: .GET, uri: requestURI, body: nil, handler: ResponseHandler(promise))
+                let responseHandler = ResponseHandler(promise)
+                impl.request(method: .GET, uri: requestURI, body: nil, handler: responseHandler)
                 return promise.futureResult
             } else {
                 return impl.makeFailedFuture(ConsulError.error("Can not build Consul API request string"))
@@ -684,36 +660,12 @@ public final class Consul: Sendable {
         }
 
         public func peers() -> EventLoopFuture<[String]> {
-            struct ResponseHandler: ConsulResponseHandler {
-                private let promise: EventLoopPromise<[String]>
-
-                init(_ promise: EventLoopPromise<[String]>) {
-                    self.promise = promise
-                }
-
-                func processResponse(_ buffer: ByteBuffer, withIndex _: Int?) {
-                    do {
-                        try buffer.withUnsafeReadableBytes { bytes in
-                            let peers = try JSONDecoder().decode([String].self, from: Data(bytes))
-                            promise.succeed(peers)
-                        }
-                    } catch {
-                        let str = buffer.hexDump(format: .detailed)
-                        promise.fail(ConsulError.error("Failed to decode response '\(str)': \(error)"))
-                    }
-                }
-
-                func fail(_ error: any Error) {
-                    promise.fail(error)
-                }
-            }
-
             var components = URLComponents()
             components.path = "/v1/status/peers"
-
             if let requestURI = components.string {
                 let promise = impl.makePromise(of: [String].self)
-                impl.request(method: .GET, uri: requestURI, body: nil, handler: ResponseHandler(promise))
+                let responseHandler = ResponseHandler(promise)
+                impl.request(method: .GET, uri: requestURI, body: nil, handler: responseHandler)
                 return promise.futureResult
             } else {
                 return impl.makeFailedFuture(ConsulError.error("Can not build Consul API request string"))
@@ -816,10 +768,8 @@ public final class Consul: Sendable {
                     promise.succeed(value)
                 }
             } catch {
-                guard let str = buffer.getString(at: buffer.readerIndex, length: buffer.readableBytes) else {
-                    fatalError("Internal error: str unexpectedly nil")
-                }
-                promise.fail(ConsulError.error("Consult response '\(str)' is not a valid JSON"))
+                let str = buffer.hexDump(format: .detailed)
+                promise.fail(ConsulError.error("Consult response is not a valid JSON: \(str)"))
             }
         }
 
