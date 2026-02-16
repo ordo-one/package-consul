@@ -186,9 +186,11 @@ public final class Consul: Sendable {
         /// - Returns: EventLoopFuture<(Int, [NodeService])> to deliver result where first element of tuple is value of "X-Consul-Index" from HTTP header
         /// [apidoc]: https://developer.hashicorp.com/consul/api-docs/catalog#list-nodes-for-service
         ///
-        public func nodes(inDatacenter datacenter: String? = nil,
-                          withService serviceName: String,
-                          poll: Poll? = nil) -> EventLoopFuture<(Int, [NodeService])> {
+        public func nodes(
+            inDatacenter datacenter: String? = nil,
+            withService serviceName: String,
+            poll: Poll? = nil
+        ) -> EventLoopFuture<(Int, [NodeService])> {
             struct ResponseHandler: ConsulResponseHandler {
                 private let promise: EventLoopPromise<(Int, [NodeService])>
 
@@ -637,6 +639,28 @@ public final class Consul: Sendable {
         }
     }
 
+    public struct StatusEndpoint: Sendable {
+        private let impl: Impl
+
+        fileprivate init(_ impl: Impl) {
+            self.impl = impl
+        }
+
+        public func leader() -> EventLoopFuture<String> {
+            let promise = impl.makePromise(of: String.self)
+            let responseHandler = ResponseHandler(promise)
+            impl.request(method: .GET, uri: "/v1/status/leader", body: nil, handler: responseHandler)
+            return promise.futureResult
+        }
+
+        public func peers() -> EventLoopFuture<[String]> {
+            let promise = impl.makePromise(of: [String].self)
+            let responseHandler = ResponseHandler(promise)
+            impl.request(method: .GET, uri: "/v1/status/peers", body: nil, handler: responseHandler)
+            return promise.futureResult
+        }
+    }
+
     public struct Poll {
         public let index: Int
         public let wait: String?
@@ -656,6 +680,7 @@ public final class Consul: Sendable {
     public let catalog: CatalogEndpoint
     public let kv: KeyValueEndpoint
     public let session: SessionEndpoint
+    public let status: StatusEndpoint
 
     final class Impl: Sendable {
         let serverHost: String
@@ -731,10 +756,8 @@ public final class Consul: Sendable {
                     promise.succeed(value)
                 }
             } catch {
-                guard let str = buffer.getString(at: buffer.readerIndex, length: buffer.readableBytes) else {
-                    fatalError("Internal error: str unexpectedly nil")
-                }
-                promise.fail(ConsulError.error("Consult response '\(str)' is not a valid JSON"))
+                let str = buffer.hexDump(format: .detailed)
+                promise.fail(ConsulError.error("Consult response is not a valid JSON: \(str)"))
             }
         }
 
@@ -758,6 +781,7 @@ public final class Consul: Sendable {
         catalog = CatalogEndpoint(impl)
         kv = KeyValueEndpoint(impl)
         session = SessionEndpoint(impl)
+        status = StatusEndpoint(impl)
     }
 
     public func syncShutdown() throws {
