@@ -647,29 +647,17 @@ public final class Consul: Sendable {
         }
 
         public func leader() -> EventLoopFuture<String> {
-            var components = URLComponents()
-            components.path = "/v1/status/leader"
-            if let requestURI = components.string {
-                let promise = impl.makePromise(of: String.self)
-                let responseHandler = ResponseHandler(promise)
-                impl.request(method: .GET, uri: requestURI, body: nil, handler: responseHandler)
-                return promise.futureResult
-            } else {
-                return impl.makeFailedFuture(ConsulError.error("Can not build Consul API request string"))
-            }
+            let promise = impl.makePromise(of: String.self)
+            let responseHandler = ResponseHandler(promise)
+            impl.request(method: .GET, uri: "/v1/status/leader", body: nil, handler: responseHandler)
+            return promise.futureResult
         }
 
         public func peers() -> EventLoopFuture<[String]> {
-            var components = URLComponents()
-            components.path = "/v1/status/peers"
-            if let requestURI = components.string {
-                let promise = impl.makePromise(of: [String].self)
-                let responseHandler = ResponseHandler(promise)
-                impl.request(method: .GET, uri: requestURI, body: nil, handler: responseHandler)
-                return promise.futureResult
-            } else {
-                return impl.makeFailedFuture(ConsulError.error("Can not build Consul API request string"))
-            }
+            let promise = impl.makePromise(of: [String].self)
+            let responseHandler = ResponseHandler(promise)
+            impl.request(method: .GET, uri: "/v1/status/peers", body: nil, handler: responseHandler)
+            return promise.futureResult
         }
     }
 
