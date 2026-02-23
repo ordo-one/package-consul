@@ -125,6 +125,16 @@ public final class Consul: Sendable {
             impl.request(method: .PUT, uri: uri, body: nil, handler: ResponseHandlerVoid(promise))
             return promise.futureResult
         }
+
+        /// Returns the agent's configuration, including datacenter, node name, and version.
+        /// [apidoc]: https://developer.hashicorp.com/consul/api-docs/agent#read-configuration
+        ///
+        public func `self`() -> EventLoopFuture<AgentSelf> {
+            let promise = impl.makePromise(of: AgentSelf.self)
+            let responseHandler = ResponseHandler(promise)
+            impl.request(method: .GET, uri: "/v1/agent/self", body: nil, handler: responseHandler)
+            return promise.futureResult
+        }
     }
 
     public struct CatalogEndpoint: Sendable {
