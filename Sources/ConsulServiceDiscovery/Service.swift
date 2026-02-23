@@ -122,6 +122,32 @@ public enum Status: String, Codable, Sendable {
     case warning
 }
 
+public struct AgentSelf: Decodable, Sendable {
+    public let config: Config
+
+    public struct Config: Decodable, Sendable {
+        public let datacenter: String
+        public let nodeID: String
+        public let nodeName: String
+        public let server: Bool
+        public let revision: String
+        public let version: String
+
+        private enum CodingKeys: String, CodingKey {
+            case datacenter = "Datacenter"
+            case nodeID = "NodeID"
+            case nodeName = "NodeName"
+            case server = "Server"
+            case revision = "Revision"
+            case version = "Version"
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case config = "Config"
+    }
+}
+
 public struct NodeService: Hashable, Decodable, Sendable {
     public let address: String?
     public let createIndex: Int?
