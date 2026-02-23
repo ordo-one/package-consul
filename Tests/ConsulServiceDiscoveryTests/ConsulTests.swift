@@ -4,6 +4,15 @@ import class NIOCore.EventLoopFuture
 import XCTest
 
 final class ConsulTests: XCTestCase {
+    func testAgentSelf() throws {
+        let consul = Consul()
+        let agentSelf = try consul.agent.`self`().wait()
+        XCTAssertFalse(agentSelf.config.datacenter.isEmpty)
+        XCTAssertFalse(agentSelf.config.nodeName.isEmpty)
+        XCTAssertFalse(agentSelf.config.version.isEmpty)
+        try consul.syncShutdown()
+    }
+
     func testRegisterDeregister() throws {
         let consul = Consul()
 
