@@ -659,6 +659,13 @@ public final class Consul: Sendable {
             impl.request(method: .GET, uri: "/v1/status/peers", body: nil, handler: responseHandler)
             return promise.futureResult
         }
+
+        public func nodes() -> EventLoopFuture<[Node]> {
+            let promise = impl.makePromise(of: [Node].self)
+            let responseHandler = ResponseHandler(promise)
+            impl.request(method: .GET, uri: "/v1/catalog/nodes", body: nil, handler: responseHandler)
+            return promise.futureResult
+        }
     }
 
     public struct Poll {
@@ -668,6 +675,22 @@ public final class Consul: Sendable {
         public init(index: Int, wait: String? = nil) {
             self.index = index
             self.wait = wait
+        }
+    }
+
+    public struct Node: Codable, Hashable, CustomStringConvertible, Sendable {
+        enum CodingKeys: String, CodingKey {
+            case name = "Node"
+            case address = "Address"
+            case datacenter = "Datacenter"
+        }
+
+        public let name: String
+        public let address: String
+        public let datacenter: String
+
+        public var description: String {
+            name
         }
     }
 
