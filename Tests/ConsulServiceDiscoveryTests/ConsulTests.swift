@@ -13,6 +13,13 @@ final class ConsulTests: XCTestCase {
         try consul.syncShutdown()
     }
 
+    func testCatalogDatacenters() throws {
+        let consul = Consul()
+        let datacenters = try consul.catalog.datacenters().wait()
+        XCTAssertFalse(datacenters.isEmpty)
+        try consul.syncShutdown()
+    }
+
     func testRegisterDeregister() throws {
         let consul = Consul()
 

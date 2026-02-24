@@ -189,6 +189,15 @@ public final class Consul: Sendable {
             }
         }
 
+        /// Returns the list of all known datacenters sorted by estimated median round trip time from the server to the servers in that datacenter.
+        /// https://developer.hashicorp.com/consul/api-docs/catalog#list-datacenters
+        public func datacenters() -> EventLoopFuture<[String]> {
+            let promise = impl.makePromise(of: [String].self)
+            let responseHandler = ResponseHandler(promise)
+            impl.request(method: .GET, uri: "/v1/catalog/datacenters", body: nil, handler: responseHandler)
+            return promise.futureResult
+        }
+
         /// Returns the nodes providing a service in a given datacenter.
         /// - Parameters
         ///    - datacenter: Specifies the datacenter to query. This will default to the datacenter of the agent being queried.
