@@ -2,8 +2,17 @@ import Dispatch
 import ServiceDiscovery
 
 public final class ConsulServiceDiscovery: ServiceDiscovery, Sendable {
-    public typealias Service = String
     public typealias Instance = NodeService
+
+    public struct Service: Hashable & Sendable {
+        public let name: String
+        public let datacenter: String?
+
+        public init(name: String, datacenter: String?) {
+            self.name = name
+            self.datacenter = datacenter
+        }
+    }
 
     private let consul: Consul
 
@@ -13,8 +22,16 @@ public final class ConsulServiceDiscovery: ServiceDiscovery, Sendable {
 
     public let defaultLookupTimeout: DispatchTimeInterval = .seconds(1)
 
-    public func lookup(_ service: Service, deadline _: DispatchTime?, callback: @escaping @Sendable (Result<[Instance], Error>) -> Void) {
-        consul.catalog.nodes(withService: service).whenComplete { result in
+    public func lookup(
+        _ service: Service,
+        deadline _: DispatchTime?,
+        callback: @escaping @Sendable (Result<[Instance], Error>
+    ) -> Void) {
+        let future = consul.catalog.nodes(
+            inDatacenter: service.datacenter,
+            withService: service.name
+        )
+        future.whenComplete { result in
             switch result {
             case .success(let (_, services)):
                 callback(.success(services))
@@ -31,7 +48,12 @@ public final class ConsulServiceDiscovery: ServiceDiscovery, Sendable {
         cancellationToken: CancellationToken,
         polling poll: Consul.Poll?
     ) {
-        consul.catalog.nodes(withService: service, poll: poll).whenComplete { result in
+        let future = consul.catalog.nodes(
+            inDatacenter: service.datacenter,
+            withService: service.name,
+            poll: poll
+        )
+        future.whenComplete { result in
             if cancellationToken.isCancelled {
                 completionHandler(.cancellationRequested)
             } else {
