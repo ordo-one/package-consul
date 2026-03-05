@@ -8,7 +8,7 @@ public final class ConsulServiceDiscovery: ServiceDiscovery, Sendable {
         public let name: String
         public let datacenter: String?
 
-        public init(name: String, datacenter: String?) {
+        public init(name: String, datacenter: String? = nil) {
             self.name = name
             self.datacenter = datacenter
         }

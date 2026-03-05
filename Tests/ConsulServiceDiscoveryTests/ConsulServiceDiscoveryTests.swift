@@ -25,7 +25,7 @@ final class ConsulServiceDiscoveryTests: XCTestCase {
         let lookupDone = eventLoopGroup.next().makePromise(of: Void.self)
 
         let consulServiceDiscovery = ConsulServiceDiscovery(consul)
-        consulServiceDiscovery.lookup(serviceName, deadline: nil) { result in
+        consulServiceDiscovery.lookup(.init(name: serviceName), deadline: nil) { result in
             switch result {
             case var .success(services):
                 services = services.filter { ($0.serviceID == "\(serviceID)-1") || ($0.serviceID == "\(serviceID)-2") }
@@ -73,7 +73,7 @@ final class ConsulServiceDiscoveryTests: XCTestCase {
 
         let consulServiceDiscovery = ConsulServiceDiscovery(consul)
         let cancellationToken = consulServiceDiscovery.subscribe(
-            to: serviceName,
+            to: .init(name: serviceName),
             onNext: { result in
                 switch result {
                 case let .success(services):
@@ -112,7 +112,7 @@ final class ConsulServiceDiscoveryTests: XCTestCase {
         var cancellationToken: CancellationToken?
         await withCheckedContinuation { continuation in
             cancellationToken = consulServiceDiscovery.subscribe(
-                to: "", // name is empty to trigger the error response from Consul
+                to: .init(name: ""), // name is empty to trigger the error response from Consul
                 onNext: { result in
                     switch result {
                     case .success:
