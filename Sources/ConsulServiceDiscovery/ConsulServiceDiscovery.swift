@@ -25,8 +25,8 @@ public final class ConsulServiceDiscovery: ServiceDiscovery, Sendable {
     public func lookup(
         _ service: Service,
         deadline _: DispatchTime?,
-        callback: @escaping @Sendable (Result<[Instance], Error>
-    ) -> Void) {
+        callback: @escaping @Sendable (Result<[Instance], Error>) -> Void
+    ) {
         let future = consul.catalog.nodes(
             inDatacenter: service.datacenter,
             withService: service.name
