@@ -24,6 +24,7 @@ let package = Package(
         .target(
             name: "ConsulServiceDiscovery",
             dependencies: [
+                .product(name: "NIOFoundationCompat", package: "swift-nio"),
                 .product(name: "NIOHTTP1", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "ServiceDiscovery", package: "swift-service-discovery"),

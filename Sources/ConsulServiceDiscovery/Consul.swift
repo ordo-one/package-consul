@@ -1,6 +1,7 @@
 import Foundation
 import Logging
 import NIOCore
+import NIOFoundationCompat
 import NIOHTTP1
 import NIOPosix
 
@@ -830,15 +831,15 @@ public final class Consul: Sendable {
             }
 
             do {
-                try buffer.withUnsafeReadableBytes { bytes -> Void in
-                    let value = try JSONDecoder().decode(T.self, from: Data(bytes))
-                    promise.succeed((withIndex, value))
-                }
+                let value = try JSONDecoder().decode(T.self, from: buffer)
+                promise.succeed((withIndex, value))
             } catch {
-                guard let str = buffer.getString(at: buffer.readerIndex, length: buffer.readableBytes) else {
-                    fatalError("Internal error: ByteBuffer.getString() unexpectedly returned nil")
+                let str = buffer.getString(at: buffer.readerIndex, length: buffer.readableBytes)
+                if let str {
+                    promise.fail(ConsulError.error("Consul response '\(str)' is not a valid JSON: \(error)"))
+                } else {
+                    promise.fail(ConsulError.error("Can't parse response from Consul: \(error)"))
                 }
-                promise.fail(ConsulError.error("Consul response '\(str)' is not a valid JSON"))
             }
         }
 
