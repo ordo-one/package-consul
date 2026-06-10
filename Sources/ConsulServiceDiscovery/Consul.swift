@@ -1,6 +1,7 @@
 import Foundation
 import Logging
 import NIOCore
+import NIOFoundationCompat
 import NIOHTTP1
 import NIOPosix
 
@@ -210,37 +211,6 @@ public final class Consul: Sendable {
             withService serviceName: String,
             poll: Poll? = nil
         ) -> EventLoopFuture<(Int, [NodeService])> {
-            struct ResponseHandler: ConsulResponseHandler {
-                private let promise: EventLoopPromise<(Int, [NodeService])>
-
-                init(_ promise: EventLoopPromise<(Int, [NodeService])>) {
-                    self.promise = promise
-                }
-
-                func processResponse(_ buffer: ByteBuffer, withIndex: Int?) {
-                    guard let withIndex else {
-                        promise.fail(ConsulError.error("Consul response has no index"))
-                        return
-                    }
-
-                    do {
-                        try buffer.withUnsafeReadableBytes { bytes -> Void in
-                            let services = try JSONDecoder().decode([NodeService].self, from: Data(bytes))
-                            promise.succeed((withIndex, services))
-                        }
-                    } catch {
-                        guard let str = buffer.getString(at: buffer.readerIndex, length: buffer.readableBytes) else {
-                            fatalError("Internal error: ByteBuffer.getString() unexpectedly returned nil")
-                        }
-                        promise.fail(ConsulError.error("Consul response '\(str)' is not a valid JSON"))
-                    }
-                }
-
-                func fail(_ error: Error) {
-                    promise.fail(error)
-                }
-            }
-
             var queryItems: [URLQueryItem] = []
 
             if let datacenter, !datacenter.isEmpty {
@@ -262,7 +232,7 @@ public final class Consul: Sendable {
 
             let promise = impl.makePromise(of: (Int, [NodeService]).self)
             if let requestURI = components.string {
-                impl.request(method: .GET, uri: requestURI, body: nil, handler: ResponseHandler(promise))
+                impl.request(method: .GET, uri: requestURI, body: nil, handler: IndexedResponseHandler(promise))
             } else {
                 promise.fail(ConsulError.error("Can not build Consul API request string"))
             }
@@ -658,6 +628,44 @@ public final class Consul: Sendable {
         }
     }
 
+    public struct PeeringEndpoint: Sendable {
+        private let impl: Impl
+
+        fileprivate init(_ impl: Impl) {
+            self.impl = impl
+        }
+
+        /// Lists all peerings known to the Consul servers.
+        /// - Parameter poll: Optional blocking query parameters.
+        /// - Returns: EventLoopFuture<(Int, [Peering])> to deliver result where first element of tuple is value of "X-Consul-Index" from HTTP header
+        /// [apidoc]: https://developer.hashicorp.com/consul/api-docs/peering#list-all-peerings
+        ///
+        public func list(poll: Poll? = nil) -> EventLoopFuture<(Int, [Peering])> {
+            var queryItems: [URLQueryItem] = []
+
+            if let poll {
+                queryItems.append(URLQueryItem(name: "index", value: "\(poll.index)"))
+                if let wait = poll.wait {
+                    queryItems.append(URLQueryItem(name: "wait", value: wait))
+                }
+            }
+
+            var components = URLComponents()
+            components.path = "/v1/peerings"
+            if !queryItems.isEmpty {
+                components.queryItems = queryItems
+            }
+
+            let promise = impl.makePromise(of: (Int, [Peering]).self)
+            if let requestURI = components.string {
+                impl.request(method: .GET, uri: requestURI, body: nil, handler: IndexedResponseHandler(promise))
+            } else {
+                promise.fail(ConsulError.error("Can not build Consul API request string"))
+            }
+            return promise.futureResult
+        }
+    }
+
     public struct StatusEndpoint: Sendable {
         private let impl: Impl
 
@@ -721,6 +729,7 @@ public final class Consul: Sendable {
     public let agent: AgentEndpoint
     public let catalog: CatalogEndpoint
     public let kv: KeyValueEndpoint
+    public let peering: PeeringEndpoint
     public let session: SessionEndpoint
     public let status: StatusEndpoint
 
@@ -808,6 +817,37 @@ public final class Consul: Sendable {
         }
     }
 
+    private struct IndexedResponseHandler<T: Decodable & Sendable>: ConsulResponseHandler, Sendable {
+        private let promise: EventLoopPromise<(Int, T)>
+
+        init(_ promise: EventLoopPromise<(Int, T)>) {
+            self.promise = promise
+        }
+
+        func processResponse(_ buffer: ByteBuffer, withIndex: Int?) {
+            guard let withIndex else {
+                promise.fail(ConsulError.error("Consul response has no index"))
+                return
+            }
+
+            do {
+                let value = try JSONDecoder().decode(T.self, from: buffer)
+                promise.succeed((withIndex, value))
+            } catch {
+                let str = buffer.getString(at: buffer.readerIndex, length: buffer.readableBytes)
+                if let str {
+                    promise.fail(ConsulError.error("Consul response '\(str)' is not a valid JSON: \(error)"))
+                } else {
+                    promise.fail(ConsulError.error("Can't parse response from Consul: \(error)"))
+                }
+            }
+        }
+
+        func fail(_ error: Error) {
+            promise.fail(error)
+        }
+    }
+
     public init(host: String = defaultHost, port: Int = defaultPort, logLevel: Logger.Level = .info) {
         // We use EventLoopFuture<> as a result for most calls,
         // the problem here is the 'future' is tied to particular event loop,
@@ -822,6 +862,7 @@ public final class Consul: Sendable {
         agent = AgentEndpoint(impl)
         catalog = CatalogEndpoint(impl)
         kv = KeyValueEndpoint(impl)
+        peering = PeeringEndpoint(impl)
         session = SessionEndpoint(impl)
         status = StatusEndpoint(impl)
     }

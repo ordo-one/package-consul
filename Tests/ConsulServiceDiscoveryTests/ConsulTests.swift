@@ -20,6 +20,20 @@ final class ConsulTests: XCTestCase {
         try consul.syncShutdown()
     }
 
+    func testPeeringList() throws {
+        let consul = Consul()
+        _ = try consul.peering.list().wait()
+        try consul.syncShutdown()
+    }
+
+    func testPeeringListPoll() throws {
+        let consul = Consul()
+        let (index, _) = try consul.peering.list().wait()
+        let (newIndex, _) = try consul.peering.list(poll: Consul.Poll(index: index, wait: "1s")).wait()
+        XCTAssertGreaterThanOrEqual(newIndex, index)
+        try consul.syncShutdown()
+    }
+
     func testRegisterDeregister() throws {
         let consul = Consul()
 

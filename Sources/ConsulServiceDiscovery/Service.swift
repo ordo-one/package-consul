@@ -206,6 +206,32 @@ public struct NodeService: Hashable, Decodable, Sendable {
     }
 }
 
+public struct Peering: Hashable, Decodable, Sendable {
+    public let id: String
+    public let name: String
+    public let state: String
+    public let partition: String?
+    public let meta: [String: String]?
+    public let peerID: String?
+    public let peerServerName: String?
+    public let peerServerAddresses: [String]?
+    public let createIndex: Int?
+    public let modifyIndex: Int?
+
+    public enum CodingKeys: String, CodingKey {
+        case id = "ID"
+        case name = "Name"
+        case state = "State"
+        case partition = "Partition"
+        case meta = "Meta"
+        case peerID = "PeerID"
+        case peerServerName = "PeerServerName"
+        case peerServerAddresses = "PeerServerAddresses"
+        case createIndex = "CreateIndex"
+        case modifyIndex = "ModifyIndex"
+    }
+}
+
 public struct Value: Hashable, Decodable, Sendable {
     public let flags: Int?
     public let key: String
