@@ -848,7 +848,7 @@ public final class Consul: Sendable {
         }
     }
 
-    public init(host: String = defaultHost, port: Int = defaultPort, logLevel: Logger.Level = .info) {
+    public init(host: String? = nil, port: Int? = nil, logLevel: Logger.Level = .info) {
         // We use EventLoopFuture<> as a result for most calls,
         // the problem here is the 'future' is tied to particular event loop,
         // and from SwiftNIO point of view it is an error if we fill the 'future'
@@ -858,6 +858,8 @@ public final class Consul: Sendable {
         // The only way to workaround that issue now is to use an event loop group
         // with only one event loop.
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        let host = host ?? Self.defaultHost
+        let port = port ?? Self.defaultPort
         impl = Impl(host, port, logLevel, eventLoopGroup)
         agent = AgentEndpoint(impl)
         catalog = CatalogEndpoint(impl)
