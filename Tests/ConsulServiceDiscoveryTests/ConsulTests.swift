@@ -145,7 +145,7 @@ final class ConsulTests: XCTestCase {
         let testKey = "test-key-does-not-exist"
         let future = consul.kv.valueForKey(testKey)
         let value = try future.wait()
-        XCTAssertEqual(value, nil)
+        XCTAssertNil(value)
         try consul.syncShutdown()
     }
 
@@ -178,7 +178,7 @@ final class ConsulTests: XCTestCase {
 
         let renewFuture = consul.session.renew(session1Id)
         let renewResult = try renewFuture.wait()
-        //print("\(renewResult)")
+        // print("\(renewResult)")
         XCTAssertEqual(renewResult.lockDelay!.ns, 1_000_000_000)
         XCTAssertEqual(renewResult.ttl, "10s")
     }
