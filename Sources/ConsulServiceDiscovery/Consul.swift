@@ -10,6 +10,9 @@ public enum ConsulError: Error {
     case httpResponseError(HTTPResponseStatus, String?)
     case failedToDecodeValue(String)
     case error(String)
+    case emptyHost
+    case invalidPort(String)
+    case portOutOfRange(String)
 }
 
 protocol ConsulResponseHandler: Sendable {
@@ -848,7 +851,7 @@ public final class Consul: Sendable {
         }
     }
 
-    public init(host: String? = nil, port: Int? = nil, logLevel: Logger.Level = .info) {
+    public init(host: String, port: Int, logLevel: Logger.Level = .info) {
         // We use EventLoopFuture<> as a result for most calls,
         // the problem here is the 'future' is tied to particular event loop,
         // and from SwiftNIO point of view it is an error if we fill the 'future'
@@ -858,8 +861,6 @@ public final class Consul: Sendable {
         // The only way to workaround that issue now is to use an event loop group
         // with only one event loop.
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        let host = host ?? Self.defaultHost
-        let port = port ?? Self.defaultPort
         impl = Impl(host, port, logLevel, eventLoopGroup)
         agent = AgentEndpoint(impl)
         catalog = CatalogEndpoint(impl)
@@ -867,6 +868,44 @@ public final class Consul: Sendable {
         peering = PeeringEndpoint(impl)
         session = SessionEndpoint(impl)
         status = StatusEndpoint(impl)
+    }
+
+    convenience public init(host: String? = nil, port: Int? = nil, logLevel: Logger.Level = .info) {
+        self.init(
+            host: host ?? Self.defaultHost,
+            port: port ?? Self.defaultPort,
+            logLevel: logLevel
+        )
+    }
+
+    static func parseAddress(_ address: String?) throws -> (host: String, port: Int) {
+        if let address, !address.isEmpty {
+            guard let colon = address.lastIndex(of: ":") else {
+                return (address, Self.defaultPort)
+            }
+
+            let host = String(address[..<colon])
+            if host.isEmpty {
+                throw ConsulError.emptyHost
+            }
+
+            let str = address[address.index(after: colon)...]
+            guard let port = Int(str) else {
+                throw ConsulError.invalidPort(String(str))
+            }
+            guard (0...65535).contains(port) else {
+                throw ConsulError.portOutOfRange(String(str))
+            }
+
+            return (host, port)
+        } else {
+            return (Self.defaultHost, Self.defaultPort)
+        }
+    }
+
+    convenience public init(address: String?, logLevel: Logger.Level = .info) throws {
+        let (host, port) = try Self.parseAddress(address)
+        self.init(host: host, port: port, logLevel: logLevel)
     }
 
     public func syncShutdown() throws {

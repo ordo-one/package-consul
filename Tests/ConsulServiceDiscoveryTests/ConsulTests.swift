@@ -182,4 +182,55 @@ final class ConsulTests: XCTestCase {
         XCTAssertEqual(renewResult.lockDelay!.ns, 1_000_000_000)
         XCTAssertEqual(renewResult.ttl, "10s")
     }
+
+    func testParseAddress() throws {
+        var (host, port): (String, Int)
+
+        (host, port) = try Consul.parseAddress(nil)
+        XCTAssertEqual(host, Consul.defaultHost)
+        XCTAssertEqual(port, Consul.defaultPort)
+
+        (host, port) = try Consul.parseAddress("")
+        XCTAssertEqual(host, Consul.defaultHost)
+        XCTAssertEqual(port, Consul.defaultPort)
+
+        (host, port) = try Consul.parseAddress("localhost")
+        XCTAssertEqual(host, "localhost")
+        XCTAssertEqual(port, Consul.defaultPort)
+
+        (host, port) = try Consul.parseAddress("localhost:12345")
+        XCTAssertEqual(host, "localhost")
+        XCTAssertEqual(port, 12_345)
+
+        XCTAssertThrowsError(try Consul.parseAddress(":8500")) { error in
+            guard let error = error as? ConsulError, case .emptyHost = error else {
+                XCTFail("expected ConsulError.emptyHost, got \(error)")
+                return
+            }
+        }
+
+        XCTAssertThrowsError(try Consul.parseAddress("localhost:")) { error in
+            guard let error = error as? ConsulError, case let .invalidPort(value) = error else {
+                XCTFail("expected ConsulError.invalidPort, got \(error)")
+                return
+            }
+            XCTAssertEqual(value, "")
+        }
+
+        XCTAssertThrowsError(try Consul.parseAddress("localhost:abc")) { error in
+            guard let error = error as? ConsulError, case let .invalidPort(value) = error else {
+                XCTFail("expected ConsulError.invalidPort, got \(error)")
+                return
+            }
+            XCTAssertEqual(value, "abc")
+        }
+
+        XCTAssertThrowsError(try Consul.parseAddress("localhost:999999")) { error in
+            guard let error = error as? ConsulError, case let .portOutOfRange(value) = error else {
+                XCTFail("expected ConsulError.portOutOfRange, got \(error)")
+                return
+            }
+            XCTAssertEqual(value, "999999")
+        }
+    }
 }
