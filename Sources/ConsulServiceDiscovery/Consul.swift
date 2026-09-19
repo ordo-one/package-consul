@@ -5,6 +5,14 @@ import NIOFoundationCompat
 import NIOHTTP1
 import NIOPosix
 
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#endif
+
 public enum ConsulError: Error {
     case failedToConnect(String)
     case httpResponseError(HTTPResponseStatus, String?)
@@ -39,12 +47,14 @@ fileprivate extension NIOBSDSocket.Option {
 fileprivate extension ClientBootstrap {
     func connectionKeepAlive(_ connectionKeepAlive: Consul.ConnectionKeepAlive?) -> Self {
         if let connectionKeepAlive {
-            _ = channelOption(ChannelOptions.socketOption(.so_keepalive), value: 1)
-            _ = channelOption(ChannelOptions.tcpOption(.tcp_keepidle), value: connectionKeepAlive.idle)
-            _ = channelOption(ChannelOptions.tcpOption(.tcp_keepintvl), value: connectionKeepAlive.interval)
-            _ = channelOption(ChannelOptions.tcpOption(.tcp_keepcnt), value: connectionKeepAlive.count)
+            return self
+                .channelOption(ChannelOptions.socketOption(.so_keepalive), value: 1)
+                .channelOption(ChannelOptions.tcpOption(.tcp_keepidle), value: connectionKeepAlive.idle)
+                .channelOption(ChannelOptions.tcpOption(.tcp_keepintvl), value: connectionKeepAlive.interval)
+                .channelOption(ChannelOptions.tcpOption(.tcp_keepcnt), value: connectionKeepAlive.count)
+        } else {
+            return self
         }
-        return self
     }
 }
 
@@ -76,9 +86,9 @@ public final class Consul: Sendable {
     // so a request can hang waiting for a response long after the connection has died.
     // We enable TCP keep-alive so that connection failures can be detected earlier.
     public struct ConnectionKeepAlive: Sendable {
-        public let idle: Int32
-        public let interval: Int32
-        public let count: Int32
+        public let idle: SocketOptionValue
+        public let interval: SocketOptionValue
+        public let count: SocketOptionValue
 
         public init(idle: Int32, interval: Int32, count: Int32) {
             precondition(idle > 0)
@@ -410,7 +420,9 @@ public final class Consul: Sendable {
                         let values = try buffer.withUnsafeReadableBytes {
                             try JSONDecoder().decode([Value].self, from: Data($0))
                         }
-                        if values.count > 0 {
+                        if values.isEmpty {
+                            promise.fail(ConsulError.error("Empty array received"))
+                        } else {
                             let value = values[0]
                             if let valueValue = value.value {
                                 if let data = Data(base64Encoded: valueValue), let str = String(data: data, encoding: .utf8) {
@@ -429,8 +441,6 @@ public final class Consul: Sendable {
                                 // nothing to decode
                                 promise.succeed(value)
                             }
-                        } else {
-                            promise.fail(ConsulError.error("Empty array received"))
                         }
                     } catch {
                         guard let str = buffer.getString(at: buffer.readerIndex, length: buffer.readableBytes) else {

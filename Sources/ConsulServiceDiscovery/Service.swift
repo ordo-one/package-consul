@@ -1,4 +1,3 @@
-
 public struct Service: Codable, Sendable {
     /// Specifies the address of the service.
     public let address: String?
