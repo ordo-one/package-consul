@@ -20,6 +20,34 @@ protocol ConsulResponseHandler: Sendable {
     func fail(_ error: Error)
 }
 
+fileprivate extension NIOBSDSocket.Option {
+    static var tcp_keepidle: NIOBSDSocket.Option {
+#if canImport(Darwin)
+        NIOBSDSocket.Option(rawValue: TCP_KEEPALIVE)
+#else
+        NIOBSDSocket.Option(rawValue: TCP_KEEPIDLE)
+#endif
+    }
+    static var tcp_keepcnt: NIOBSDSocket.Option {
+        NIOBSDSocket.Option(rawValue: TCP_KEEPCNT)
+    }
+    static var tcp_keepintvl: NIOBSDSocket.Option {
+        NIOBSDSocket.Option(rawValue: TCP_KEEPINTVL)
+    }
+}
+
+fileprivate extension ClientBootstrap {
+    func connectionKeepAlive(_ connectionKeepAlive: Consul.ConnectionKeepAlive?) -> Self {
+        if let connectionKeepAlive {
+            _ = channelOption(ChannelOptions.socketOption(.so_keepalive), value: 1)
+            _ = channelOption(ChannelOptions.tcpOption(.tcp_keepidle), value: connectionKeepAlive.idle)
+            _ = channelOption(ChannelOptions.tcpOption(.tcp_keepintvl), value: connectionKeepAlive.interval)
+            _ = channelOption(ChannelOptions.tcpOption(.tcp_keepcnt), value: connectionKeepAlive.count)
+        }
+        return self
+    }
+}
+
 public final class Consul: Sendable {
     static let reconnectInterval: TimeAmount = .seconds(5)
 
@@ -42,6 +70,28 @@ public final class Consul: Sendable {
         let defaultPort = 8_500
         return Self.urlFromEnv?.port ?? defaultPort
     }
+
+    // We simulate a continuous subscription with a sequence of HTTP blocking queries.
+    // The problem is that HTTP itself provides no connection liveness checks,
+    // so a request can hang waiting for a response long after the connection has died.
+    // We enable TCP keep-alive so that connection failures can be detected earlier.
+    public struct ConnectionKeepAlive: Sendable {
+        public let idle: Int32
+        public let interval: Int32
+        public let count: Int32
+
+        public init(idle: Int32, interval: Int32, count: Int32) {
+            precondition(idle > 0)
+            precondition(interval > 0)
+            precondition(count > 0)
+            self.idle = idle
+            self.interval = interval
+            self.count = count
+        }
+    }
+
+    // With the settings below, a dead connection is detected in about 15 seconds.
+    public static let defaultKeepAlive = ConnectionKeepAlive(idle: 10, interval: 1, count: 5)
 
     public struct AgentEndpoint: Sendable {
         private let impl: Impl
@@ -739,20 +789,34 @@ public final class Consul: Sendable {
     final class Impl: Sendable {
         let serverHost: String
         let serverPort: Int
+        let connectionKeepAlive: ConnectionKeepAlive?
         let eventLoopGroup: EventLoopGroup
         let logger: Logger
 
-        init(_ serverHost: String, _ serverPort: Int, _ logLevel: Logger.Level, _ eventLoopGroup: EventLoopGroup) {
+        init(
+            _ serverHost: String,
+            _ serverPort: Int,
+            _ connectionKeepAlive: ConnectionKeepAlive?,
+            _ logLevel: Logger.Level,
+            _ eventLoopGroup: EventLoopGroup
+        ) {
             self.serverHost = serverHost
             self.serverPort = serverPort
+            self.connectionKeepAlive = connectionKeepAlive
             self.eventLoopGroup = eventLoopGroup
             var logger = Logger(label: "consul")
             logger.logLevel = logLevel
             self.logger = logger
         }
 
-        func request(method requestMethod: HTTPMethod, uri requestURI: String, body requestBody: ByteBuffer?, handler: some ConsulResponseHandler) {
+        func request(
+            method requestMethod: HTTPMethod,
+            uri requestURI: String,
+            body requestBody: ByteBuffer?,
+            handler: some ConsulResponseHandler
+        ) {
             ClientBootstrap(group: eventLoopGroup)
+                .connectionKeepAlive(connectionKeepAlive)
                 .channelInitializer { channel in
                     channel.pipeline.addHTTPClientHandlers(position: .first, leftOverBytesStrategy: .fireError).flatMap {
                         channel.pipeline.addHandler(HTTPHandler(self.serverHost,
@@ -766,7 +830,10 @@ public final class Consul: Sendable {
                 }
                 .connect(host: serverHost, port: serverPort)
                 .whenFailure { error in
-                    let message = "Failed to connect to consul API @ \(self.serverHost):\(self.serverPort): \(error.localizedDescription)"
+                    let message = """
+                        Failed to connect to consul API @ \
+                        \(self.serverHost):\(self.serverPort): \(error.localizedDescription)
+                        """
                     handler.fail(ConsulError.failedToConnect(message))
                 }
         }
@@ -851,7 +918,12 @@ public final class Consul: Sendable {
         }
     }
 
-    public init(host: String, port: Int, logLevel: Logger.Level = .info) {
+    public init(
+        host: String,
+        port: Int,
+        connectionKeepAlive: ConnectionKeepAlive?,
+        logLevel: Logger.Level = .info
+    ) {
         // We use EventLoopFuture<> as a result for most calls,
         // the problem here is the 'future' is tied to particular event loop,
         // and from SwiftNIO point of view it is an error if we fill the 'future'
@@ -861,7 +933,7 @@ public final class Consul: Sendable {
         // The only way to workaround that issue now is to use an event loop group
         // with only one event loop.
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        impl = Impl(host, port, logLevel, eventLoopGroup)
+        impl = Impl(host, port, connectionKeepAlive, logLevel, eventLoopGroup)
         agent = AgentEndpoint(impl)
         catalog = CatalogEndpoint(impl)
         kv = KeyValueEndpoint(impl)
@@ -870,10 +942,16 @@ public final class Consul: Sendable {
         status = StatusEndpoint(impl)
     }
 
-    convenience public init(host: String? = nil, port: Int? = nil, logLevel: Logger.Level = .info) {
+    convenience public init(
+        host: String? = nil,
+        port: Int? = nil,
+        connectionKeepAlive: ConnectionKeepAlive? = defaultKeepAlive,
+        logLevel: Logger.Level = .info
+    ) {
         self.init(
             host: host ?? Self.defaultHost,
             port: port ?? Self.defaultPort,
+            connectionKeepAlive: connectionKeepAlive,
             logLevel: logLevel
         )
     }
@@ -903,9 +981,13 @@ public final class Consul: Sendable {
         }
     }
 
-    convenience public init(address: String?, logLevel: Logger.Level = .info) throws {
+    convenience public init(
+        address: String?,
+        connectionKeepAlive: ConnectionKeepAlive? = defaultKeepAlive,
+        logLevel: Logger.Level = .info
+    ) throws {
         let (host, port) = try Self.parseAddress(address)
-        self.init(host: host, port: port, logLevel: logLevel)
+        self.init(host: host, port: port, connectionKeepAlive: connectionKeepAlive, logLevel: logLevel)
     }
 
     public func syncShutdown() throws {
