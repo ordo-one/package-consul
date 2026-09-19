@@ -90,7 +90,7 @@ public final class Consul: Sendable {
         public let interval: SocketOptionValue
         public let count: SocketOptionValue
 
-        public init(idle: Int32, interval: Int32, count: Int32) {
+        public init(idle: SocketOptionValue, interval: SocketOptionValue, count: SocketOptionValue) {
             precondition(idle > 0)
             precondition(interval > 0)
             precondition(count > 0)
