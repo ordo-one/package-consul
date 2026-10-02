@@ -98,7 +98,7 @@ final class ConsulTests: XCTestCase {
             break
         }
 
-        try consul.syncShutdown()
+        try await consul.shutdown()
     }
 
     func testSC1936NonJsonResponseFromConsul() throws {

@@ -127,6 +127,6 @@ final class ConsulServiceDiscoveryTests: XCTestCase {
         if let cancellationToken {
             cancellationToken.cancel()
         }
-        try consul.syncShutdown()
+        try await consul.shutdown()
     }
 }

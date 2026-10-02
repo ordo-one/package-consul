@@ -1003,6 +1003,12 @@ public final class Consul: Sendable {
     public func syncShutdown() throws {
         try impl.eventLoopGroup.syncShutdownGracefully()
     }
+
+    /// For async callers: `syncShutdown()` parks its thread until a dispatch worker signals the end,
+    /// which can deadlock a cooperative pool whose threads all wait like that.
+    public func shutdown() async throws {
+        try await impl.eventLoopGroup.shutdownGracefully()
+    }
 }
 
 private final class HTTPHandler: @unchecked Sendable, ChannelInboundHandler {
