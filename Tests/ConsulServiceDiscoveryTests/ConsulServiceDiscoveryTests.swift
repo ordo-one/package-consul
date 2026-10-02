@@ -1,5 +1,5 @@
-@testable import ConsulServiceDiscovery
 import Atomics
+@testable import ConsulServiceDiscovery
 import NIOPosix
 import ServiceDiscovery
 import XCTest
@@ -127,6 +127,6 @@ final class ConsulServiceDiscoveryTests: XCTestCase {
         if let cancellationToken {
             cancellationToken.cancel()
         }
-        try consul.syncShutdown()
+        try await consul.shutdown()
     }
 }

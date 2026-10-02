@@ -223,7 +223,7 @@ public final class Consul: Sendable {
 
                 func processResponse(_ buffer: ByteBuffer, withIndex _: Int?) {
                     do {
-                        try buffer.withUnsafeReadableBytes { bytes -> Void in
+                        try buffer.withUnsafeReadableBytes { bytes in
                             let dict = try JSONDecoder().decode([String: [String]].self, from: Data(bytes))
                             promise.succeed(Array(dict.keys))
                         }
@@ -559,7 +559,7 @@ public final class Consul: Sendable {
 
                 func processResponse(_ buffer: ByteBuffer, withIndex _: Int?) {
                     do {
-                        try buffer.withUnsafeReadableBytes { bytes -> Void in
+                        try buffer.withUnsafeReadableBytes { bytes in
                             let response = try JSONDecoder().decode(CreateResponse.self, from: Data(bytes))
                             promise.succeed(response.id)
                         }
@@ -882,7 +882,7 @@ public final class Consul: Sendable {
 
         func processResponse(_ buffer: ByteBuffer, withIndex: Int?) {
             do {
-                try buffer.withUnsafeReadableBytes { bytes -> Void in
+                try buffer.withUnsafeReadableBytes { bytes in
                     let value = try JSONDecoder().decode(T.self, from: Data(bytes))
                     promise.succeed(value)
                 }
@@ -952,7 +952,7 @@ public final class Consul: Sendable {
         status = StatusEndpoint(impl)
     }
 
-    convenience public init(
+    public convenience init(
         host: String? = nil,
         port: Int? = nil,
         connectionKeepAlive: ConnectionKeepAlive? = defaultKeepAlive,
@@ -981,7 +981,7 @@ public final class Consul: Sendable {
             guard let port = Int(str) else {
                 throw ConsulError.invalidPort(String(str))
             }
-            guard (0...65535).contains(port) else {
+            guard (0...65_535).contains(port) else {
                 throw ConsulError.portOutOfRange(String(str))
             }
 
@@ -991,7 +991,7 @@ public final class Consul: Sendable {
         }
     }
 
-    convenience public init(
+    public convenience init(
         address: String?,
         connectionKeepAlive: ConnectionKeepAlive? = defaultKeepAlive,
         logLevel: Logger.Level = .info
@@ -1002,6 +1002,12 @@ public final class Consul: Sendable {
 
     public func syncShutdown() throws {
         try impl.eventLoopGroup.syncShutdownGracefully()
+    }
+
+    /// For async callers: `syncShutdown()` parks its thread until a dispatch worker signals the end,
+    /// which can deadlock a cooperative pool whose threads all wait like that.
+    public func shutdown() async throws {
+        try await impl.eventLoopGroup.shutdownGracefully()
     }
 }
 
