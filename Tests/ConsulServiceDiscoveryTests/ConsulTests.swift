@@ -1,6 +1,6 @@
 @testable import ConsulServiceDiscovery
-import NIOPosix
 import class NIOCore.EventLoopFuture
+import NIOPosix
 import XCTest
 
 final class ConsulTests: XCTestCase {
@@ -153,12 +153,12 @@ final class ConsulTests: XCTestCase {
         let pid = ProcessInfo.processInfo.processIdentifier
         let consul = Consul()
 
-        let session1 = Session(lockDelay: 1*1_000_000_000, ttl: "10s")
+        let session1 = Session(lockDelay: 1 * 1_000_000_000, ttl: "10s")
         let session1Future = consul.session.create(session1)
         let session1Id = try session1Future.wait()
         // print("session1=\(session1Id)")
 
-        let session2 = Session(lockDelay: 1*1_000_000_000, ttl: "10s")
+        let session2 = Session(lockDelay: 1 * 1_000_000_000, ttl: "10s")
         let session2Future = consul.session.create(session2)
         let session2Id = try session2Future.wait()
         // print("session2=\(session2Id)")

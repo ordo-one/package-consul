@@ -1,5 +1,5 @@
-@testable import ConsulServiceDiscovery
 import Atomics
+@testable import ConsulServiceDiscovery
 import NIOPosix
 import ServiceDiscovery
 import XCTest

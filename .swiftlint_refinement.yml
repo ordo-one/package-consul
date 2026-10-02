@@ -1,1 +1,16 @@
 excluded:
+nesting:
+  type_level:
+    warning: 3
+    error: 3
+identifier_name:
+  excluded: [id, i, j, k, ns, kv, tcp_keepidle, tcp_keepcnt, tcp_keepintvl]
+file_length:
+  warning: 1200
+  error: 1500
+type_body_length:
+  warning: 750
+  error: 1000
+function_body_length:
+  warning: 80
+  error: 120
