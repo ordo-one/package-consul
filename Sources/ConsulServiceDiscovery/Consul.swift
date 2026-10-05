@@ -23,6 +23,30 @@ public enum ConsulError: Error {
     case portOutOfRange(String)
 }
 
+extension ConsulError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case let .failedToConnect(message):
+            return "Failed to connect to Consul: \(message)"
+        case let .httpResponseError(status, body):
+            if let body, !body.isEmpty {
+                return "Consul HTTP response error \(status.code) \(status.reasonPhrase): \(body)"
+            }
+            return "Consul HTTP response error \(status.code) \(status.reasonPhrase)"
+        case let .failedToDecodeValue(value):
+            return "Failed to decode value '\(value)'"
+        case let .error(message):
+            return message
+        case .emptyHost:
+            return "Consul address has an empty host"
+        case let .invalidPort(port):
+            return "Consul address has an invalid port '\(port)'"
+        case let .portOutOfRange(port):
+            return "Consul address port '\(port)' is out of range"
+        }
+    }
+}
+
 protocol ConsulResponseHandler: Sendable {
     func processResponse(_ buffer: ByteBuffer, withIndex: Int?)
     func fail(_ error: Error)
