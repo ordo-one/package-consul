@@ -3,11 +3,9 @@ runs:
   using: "composite"
   steps:
     - uses: nahsi/setup-hashi-tool@v1
-      if: github.repository == 'ordo-one/package-consul' || github.repository == 'ordo-one/package-distributed-system'
       with:
         name: consul
-    - name: Start consul 
-      if: github.repository == 'ordo-one/package-consul' || github.repository == 'ordo-one/package-distributed-system'
+    - name: Start consul
       shell: bash
       run: |
         consul agent -dev -log-level=warn &
