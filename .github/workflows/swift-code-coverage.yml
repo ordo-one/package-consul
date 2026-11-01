@@ -15,15 +15,15 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
+    - name: Start consul
+      uses: ./.github/actions/consul-start
+
     - name: Install deps
       run: |
         apt-get update -q && apt-get install -y -q libjemalloc-dev curl
 
     - name: Swift version
       run: swift --version
-
-    - name: Start consul
-      uses: ./.github/actions/consul-start
 
     - name: Run tests
       continue-on-error: true
